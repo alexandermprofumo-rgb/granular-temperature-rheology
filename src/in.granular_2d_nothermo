@@ -1,0 +1,108 @@
+# 2D sheared granular flow with NO THERMOSTAT.  Theta is set by the balance
+# of shear heating against inelastic dissipation; restitution is the lever.
+#
+# WHY: every n in this project was measured with a Langevin thermostat
+# imposing Theta, and Tier 0-A showed n depends on the thermostat damping
+# time. So n is not protocol-invariant, which undermines every number. A
+# Langevin bath is also a physically odd way to agitate a dense granular
+# flow -- real flows generate their fluctuations from the shear itself.
+#
+# This removes the bath entirely. At fixed gdot and Pconf the inertial number
+# I is pinned, while Theta settles wherever heating balances dissipation.
+# Raising the restitution e dissipates less and runs hotter, so e scans Theta
+# at fixed I with no thermostat anywhere.
+#
+# HOW TO READ THE RESULT. Do not just compare fitted n. Overlay these (Theta,
+# mu) points on the thermostatted matched sweep at the SAME mu_g, Pconf and
+# gdot (sweep_matched2d, e=0.5). If both protocols trace one mu(Theta) curve,
+# the thermostatted measurement is validated and the tdamp dependence is a
+# curiosity. If they trace different curves, the paper's central quantity is
+# protocol-dependent.
+#
+# HONEST CAVEAT: this lever is not clean either. The thermostat varies Theta
+# through an external bath at fixed contact model; e varies Theta by CHANGING
+# the contact model, and e may affect mu directly rather than only through
+# Theta. So agreement is strong evidence the protocol is sound, while
+# disagreement is ambiguous between "the thermostat distorts things" and "e
+# affects mu directly". Agreement is the informative outcome.
+#
+# RUN LENGTH: with a bath, Theta is imposed within a few damping times. Here
+# the fabric AND the heating balance must self-organise, which takes strain of
+# order 0.1-1, so these runs are ~3x longer than the thermostatted ones
+# (measurement strain 0.25 vs 0.12).
+#
+# Usage:
+#   lmp -in in.granular_2d_nothermo -var datafile data.q -var mu_g 0.3 \
+#       -var e_rest 0.9 -var gdot 1.0e-3 -var Pconf 10.0 -var seed 1 \
+#       -var label nt_e0.9 -var nequil 150000 -var nmeas 250000
+
+variable datafile index data.granular
+variable mu_g     index 0.3
+variable gdot     index 1.0e-3
+variable Pconf    index 10.0
+variable e_rest   index 0.5
+variable seed     index 12345
+variable label    index nothermo
+variable nequil   index 150000
+variable nmeas    index 250000
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 ${e_rest} tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        0.001
+thermo          1000
+thermo_style    custom step ke
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+
+# Bias-corrected temperature: still needed to MEASURE Theta (remove the
+# affine streaming velocity), even though nothing is thermostatting it.
+compute         tbias all temp/deform
+compute         press all pressure tbias
+
+# Integrate with plain NVE -- no langevin. The barostat still holds Pconf so
+# that I stays fixed, but without ptemp: there is no setpoint temperature to
+# hand it, so it uses the measured (bias-corrected) pressure directly.
+fix             integrate2 all nve/sphere
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0
+fix_modify      baro press press
+
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+
+variable        P      equal (c_press[1]+c_press[2])/2.0
+variable        tau    equal c_press[4]
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+variable        Zc     equal c_Zbulk
+
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner v_Zc
+thermo          5000
+log             log.${label} append
+
+run             ${nequil}
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} e_rest=${e_rest} Theta=$(c_tbias) Z=$(c_Zbulk)"

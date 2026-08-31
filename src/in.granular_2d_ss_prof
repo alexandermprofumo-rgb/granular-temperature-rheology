@@ -1,0 +1,163 @@
+# STEADY-STATE 2D production deck + VELOCITY PROFILE.  Identical physics to
+# in.granular_2d_ss; adds a binned v_x(y) profile so the affine-streaming
+# assumption behind compute temp/deform can be checked rather than assumed.
+#
+# THREE CHANGES, all forced by the audit:
+#
+# 1. STRAIN.  in.granular_2d shears to total strain gdot*dt*(nequil+nmeas) =
+#    0.12, and mu is still rising +14.9% between the first and second halves of
+#    the measurement window in 97% of runs.  Worse, the size of that transient
+#    depends on Theta -- at mu_g = 0.3 the shortfall against steady state grows
+#    from 1% at the coldest setpoint to 8% at the warmest -- and since n is a
+#    Theta-derivative that biases n by +0.029, which is the whole discrepancy
+#    between the production n = 0.145 and the strain-1.5 value 0.116.
+#    Defaults here are nequil/nmeas = 1e6, i.e. strain 1.0 of equilibration and
+#    1.0 of measurement.  (a_c and a_n both reach 90% of steady by strain 0.06,
+#    so 1.0 is comfortable, not marginal.)
+#
+# 2. TANGENTIAL FORCES IN THE DUMP.  compute pair/local's fx,fy are purely
+#    CENTRAL, so the old dump could not give a_t and it had to be closed as
+#    2*mu - a_c - a_n.  Closure absorbs every error in the other two channels
+#    into a_t, which is exactly where the high-friction claim lives.  p1,p2 are
+#    the tangential force vector and p4 its magnitude (as in
+#    in.contact_tracking_forces_2d), so a_t and chi are now measured.
+#      Column layout:  index id1 id2 dist dx dy fx fy ftx fty ftmag
+#
+# 3. DISC INERTIA + enforce2d.  fix nve/sphere without `disc` gives 2D disks
+#    the moment of inertia of a sphere, (2/5)mr^2 instead of (1/2)mr^2 -- a 20%
+#    error in rotational inertia in the dimension where the rotation story is
+#    strongest.  enforce2d is belt-and-braces (this LAMMPS build already keeps
+#    vz identically zero, verified) but costs nothing.
+#    NOTE: change 3 alters the physics, so it is NOT a pure re-run.  Keep a
+#    couple of cells both ways to confirm it does not matter.
+#
+# Usage:
+#   lmp -in in.granular_2d_ss -var datafile data.q -var mu_g 0.1 \
+#       -var gdot 1.0e-3 -var Tgran 0.003 -var Pconf 10.0 -var seed 1 \
+#       -var label ss001 -var nequil 1000000 -var nmeas 1000000 \
+#       -var cdump_every 25000
+
+variable datafile index data.granular
+variable mu_g     index 0.1
+variable gdot     index 1.0e-3
+variable Tgran    index 0.02
+variable Pconf    index 0.05
+variable seed     index 12345
+variable label    index test
+variable nequil   index 1000000
+variable nmeas    index 1000000
+variable cdump_every index 25000
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+# pair style: Hertzian normal contact + Coulomb-limited (Mindlin)
+# tangential history, friction coefficient mu_g. Coefficients:
+#   normal:  Hertzian, effective modulus 1.0e5, Poisson 0.3, restitution 0.5
+#   tangential: mindlin, tangential stiffness ratio auto (NULL), damping 1.0,
+#               friction coefficient mu_g
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+# initial relaxation: settle overlaps, no shear
+fix             integrate all nve/sphere disc
+fix             damp all viscous 1.0
+timestep        0.001
+thermo          500
+thermo_style    custom step ke
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+# Lees-Edwards simple shear via triclinic box deformation
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+
+# ---- bias-corrected granular temperature: removes the affine shear
+# streaming velocity so thermostat + diagnostics see non-affine motion only
+compute         tbias all temp/deform
+
+# thermostat the fluctuation temperature only (independent of I)
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+
+# stress tensor / pressure (bias-corrected)
+compute         press all pressure tbias
+
+# ---- constant-pressure ensemble: barostat only the y box length to hold
+# the confining pressure Pconf fixed, decoupled from the imposed xy shear
+# (fix deform above only touches the xy tilt factor, not Ly, so the two
+# do not fight over the same degree of freedom). This is what keeps the
+# inertial number I fixed while Theta is scanned via Tgran -- without it,
+# raising Tgran inflates the measured pressure at fixed box area and I
+# drifts by up to 7x across a Theta sweep, confounding the n(mu_g) fit.
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran} disc
+fix_modify      baro press press
+# after the integrating fixes, as LAMMPS requires
+fix             flat all enforce2d
+
+variable        P      equal (c_press[1]+c_press[2])/2.0
+variable        tau    equal c_press[4]
+# fix deform's xy erate convention makes tau come out negative here; only
+# the magnitude is physical, so mu is defined from |tau|
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5   # nominal mean radius (matches gen_data.py default range)
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+
+# per-contact geometry dump for the fabric tensor (post-processed)
+compute         cid all property/local patom1 patom2
+compute         cpl all pair/local dist dx dy fx fy p1 p2 p4
+dump            contacts all local ${cdump_every} dump.contacts.${label} &
+                index c_cid[1] c_cid[2] c_cpl[1] c_cpl[2] c_cpl[3] &
+                c_cpl[4] c_cpl[5] c_cpl[6] c_cpl[7] c_cpl[8]
+dump_modify     contacts first no
+
+# rotational granular temperature
+# Theta as thermostatted and reported is TRANSLATIONAL only (compute
+# temp/deform); rotation is never thermostatted and has never been measured.
+# Now that n is known to vanish with friction -- and friction is precisely what
+# couples translation to rotation -- Theta_rot is the most natural control
+# variable that has never been on the candidate list.
+compute         erot all erotate/sphere
+variable        Trot  equal 2.0*c_erot/(count(all))
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+variable        Zc     equal c_Zbulk
+# velocity profile, for the temp/deform audit
+# compute temp/deform (and therefore every Theta in this project) subtracts the
+# AFFINE streaming field v_x = gdot*y and calls what is left the granular
+# temperature. If the real profile is not affine -- shear banding, plug flow, a
+# wall-free but still curved profile -- the missing streaming motion is counted
+# as Theta and every n inherits it. Nothing in the project has ever looked.
+# Bins are in reduced y so they follow the barostatted box height.
+compute         chy all chunk/atom bin/1d y lower 0.05 units reduced
+# ave/chunk requires pf_every*pf_rep <= nmeas and nmeas a multiple of pf_every.
+# Defaults suit the production nmeas = 500000 (400 samples spanning the last
+# 80% of the measurement window); the driver overrides them for short runs.
+variable        pf_every index 1000
+variable        pf_rep   index 400
+fix             prof all ave/chunk ${pf_every} ${pf_rep} ${nmeas} chy vx vy &
+                density/number file prof.${label}
+
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner v_Zc v_Trot
+thermo          1000
+
+log             log.${label} append
+
+run             ${nequil}
+
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} gdot=${gdot} Tgran=${Tgran} seed=${seed} Z=$(c_Zbulk)"

@@ -1,0 +1,88 @@
+# 3D dense sheared granular flow (spheres): test whether n deviates below
+# 1/6 for frictionless grains, the way 2D showed a deviation below 1/8 --
+# i.e. whether the "friction enables rotation-translation coupling that
+# drives fabric relaxation" story generalizes from 2D to 3D.
+#
+# Same fixed-pressure / fixed-I methodology as in.granular_2d, just in 3D:
+# shear (xy tilt) sets I; a 1D barostat on y holds confining pressure (and
+# hence I) fixed while a bias-corrected Langevin thermostat scans Theta.
+#
+# Usage:
+#   lmp -in in.granular_3d -var datafile data.granular3d -var mu_g 0.0 \
+#       -var gdot 1.0e-3 -var Tgran 0.01 -var Pconf 2.0 -var seed 1 \
+#       -var label run3d001 -var nequil 40000 -var nmeas 80000
+
+variable datafile index data.granular3d
+variable mu_g     index 0.0
+variable gdot     index 1.0e-3
+variable Tgran    index 0.01
+variable Pconf    index 2.0
+variable seed     index 12345
+variable label    index test3d
+variable nequil   index 40000
+variable nmeas    index 80000
+
+units           lj
+dimension       3
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+# initial relaxation: settle overlaps, no shear
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        0.001
+thermo          500
+thermo_style    custom step ke
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+# Lees-Edwards simple shear: flow in x, gradient in y, vorticity in z
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+
+compute         tbias all temp/deform
+
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+
+compute         press all pressure tbias
+
+# ---- constant-pressure ensemble: barostat only the y box length (gradient
+# direction), decoupled from the imposed xy shear and z (vorticity)
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+
+variable        P      equal (c_press[1]+c_press[2]+c_press[3])/3.0
+variable        tau    equal c_press[4]
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+
+# ---- per-contact geometry dump (now includes dz) for the 3D fabric tensor
+compute         pl all pair/local dx dy dz fx fy fz
+dump            contacts all local 5000 dump.contacts.${label} index c_pl[1] c_pl[2] c_pl[3] c_pl[4] c_pl[5] c_pl[6]
+dump_modify     contacts first no
+
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner
+thermo          1000
+
+log             log.${label} append
+
+run             ${nequil}
+
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} gdot=${gdot} Tgran=${Tgran} seed=${seed}"

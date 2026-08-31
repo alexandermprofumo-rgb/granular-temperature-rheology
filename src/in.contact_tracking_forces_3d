@@ -1,0 +1,109 @@
+# Contact tracking WITH per-contact forces, 3D spheres.
+#
+# Direct analogue of in.contact_tracking_forces_2d. Purpose is the joint
+# 2D+3D Delta-Z_eff collapse test: the generalized-isostaticity framework
+# predicts that n collapses onto a single function of Delta-Z_eff = Z - Z_c(chi)
+# in BOTH dimensions at once, which is the strongest available test of it.
+# In 2D the collapse failed (n was two-branched); 3D decides whether that is
+# a dimension-specific failure or a general one.
+#
+# Physical protocol is byte-for-byte the same as in.granular_3d (same
+# relaxation, Lees-Edwards shear, bias-corrected Langevin thermostat, 1D
+# barostat, and the phi=0.64 / Pconf=10 packing calibrated to give Z ~ 6,
+# the 3D frictionless isostatic value), so results stay comparable to the
+# published 3D sweep.
+#
+# WHAT IS DIFFERENT FROM in.granular_3d
+# The production 3D input dumps  dx dy dz fx fy fz  from compute pair/local.
+# Those forces are purely CENTRAL -- the granular pair style's single()
+# method omits the history-dependent tangential force -- so they cannot give
+# the Coulomb-mobilised fraction chi. The tangential force is instead exposed
+# through the pair style's own extra outputs: p1,p2,p3 are the tangential
+# force vector and p4 its magnitude. This input dumps those.
+#
+# Column layout of dump.contacts.<label>:
+#   index id1 id2 dist dx dy dz fx fy fz ftx fty ftz ftmag
+# with normal force f_n = |(fx,fy,fz)| and |f_t| = ftmag, so a contact's
+# Coulomb mobilisation is |f_t| / (mu_g * f_n).
+#
+# Only contacts are dumped, not per-atom kinematics: the 3D target is the
+# instantaneous collapse test (chi, Z, force-weighted fabric), and the
+# episode-tracking analyses that need per-atom data were already run and
+# falsified in 2D.
+#
+# Usage:
+#   lmp -in in.contact_tracking_forces_3d -var datafile data.q3d \
+#       -var mu_g 0.1 -var gdot 1.0e-3 -var Tgran 0.003 -var Pconf 10.0 \
+#       -var seed 1 -var label trk3d -var nequil 40000 -var ntrack 3000 \
+#       -var cdump_every 50
+
+variable datafile     index data.granular3d
+variable mu_g         index 0.0
+variable gdot         index 1.0e-3
+variable Tgran        index 0.003
+variable Pconf        index 10.0
+variable seed         index 12345
+variable label        index trk3dtest
+variable nequil       index 40000
+variable ntrack       index 3000
+variable cdump_every  index 50
+
+units           lj
+dimension       3
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+# overlap relaxation (identical to production)
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        0.001
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+# shear + thermostat + barostat (identical to production)
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+compute         tbias all temp/deform
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+compute         press all pressure tbias
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+fix_modify      baro press press
+
+variable        P equal (c_press[1]+c_press[2]+c_press[3])/3.0
+
+# coordination number, so an under-jammed state cannot pass unnoticed
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+
+thermo_style    custom step v_P c_tbias c_Zbulk
+thermo          2000
+
+log             log.${label} append
+
+run             ${nequil}
+
+# per-contact geometry + normal and tangential forces
+compute         cid all property/local patom1 patom2
+compute         cpl all pair/local dist dx dy dz fx fy fz p1 p2 p3 p4
+dump            contactdump all local ${cdump_every} dump.contacts.${label} &
+                index c_cid[1] c_cid[2] c_cpl[1] c_cpl[2] c_cpl[3] c_cpl[4] &
+                c_cpl[5] c_cpl[6] c_cpl[7] c_cpl[8] c_cpl[9] c_cpl[10] c_cpl[11]
+dump_modify     contactdump first yes
+
+print           "=== BEGIN CONTACT TRACKING ${label} ==="
+run             ${ntrack}
+print           "DONE label=${label} mu_g=${mu_g} Tgran=${Tgran} seed=${seed}"

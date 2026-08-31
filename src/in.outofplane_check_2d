@@ -1,0 +1,45 @@
+# Minimal replica of in.granular_2d's dynamics, instrumented for out-of-plane motion.
+variable datafile index data.m2d_seed1
+variable mu_g  index 0.3
+variable gdot  index 1.0e-3
+variable Tgran index 0.003
+variable Pconf index 10.0
+variable seed  index 1
+units lj
+dimension 2
+atom_style sphere
+boundary p p p
+newton off
+read_data ${datafile}
+pair_style granular
+pair_coeff * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+neighbor 0.3 bin
+neigh_modify every 1 delay 0 check yes
+comm_modify vel yes
+fix integrate all nve/sphere
+fix damp all viscous 1.0
+timestep 0.001
+thermo 500
+thermo_style custom step ke
+run 3000
+unfix damp
+unfix integrate
+velocity all set 0.0 0.0 0.0
+reset_timestep 0
+change_box all triclinic
+fix shear all deform 1 xy erate ${gdot} remap v units box
+compute tbias all temp/deform
+fix therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify therm temp tbias
+compute press all pressure tbias
+fix baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+fix_modify baro press press
+# instrumentation: out-of-plane kinetic energy and rotation
+compute vzsq all reduce sumsq vz
+compute vxsq all reduce sumsq vx
+compute vysq all reduce sumsq vy
+compute zmax all reduce max z
+variable Theta equal c_tbias
+thermo_style custom step c_tbias c_vxsq c_vysq c_vzsq c_zmax
+thermo 2000
+run 20000

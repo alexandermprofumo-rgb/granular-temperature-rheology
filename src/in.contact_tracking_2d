@@ -1,0 +1,85 @@
+# Contact-lifetime tracking: after the usual equilibration under shear +
+# thermostat + barostat (same setup as in.granular_2d), switch to a SHORT,
+# HIGH-FREQUENCY dump of per-contact data tagged by atom ID pair (p1,p2),
+# so contacts can be tracked across frames in post-processing to measure:
+#   - contact persistence time tau_p(Theta)          [frictionless renewal
+#                                                       picture]
+#   - reorientation of each contact's normal n over its lifetime, and how
+#     that correlates with tangential-force mobilization |Ft|/(mu_g*Fn)
+#                                                     [frictional stick-slip
+#                                                       picture]
+#
+# This is a diagnostic run, not part of the main mu(Theta) sweep -- keep N
+# modest and the tracked window short, since per-step contact dumps are
+# large.
+#
+# Usage:
+#   lmp -in in.contact_tracking_2d -var datafile data.q -var mu_g 0.0 \
+#       -var gdot 1.0e-3 -var Tgran 0.006 -var Pconf 2.0 -var seed 1 \
+#       -var label track_mu0.0_T0.006 -var nequil 20000 \
+#       -var ntrack 3000 -var dump_every 10
+
+variable datafile   index data.q
+variable mu_g       index 0.0
+variable gdot       index 1.0e-3
+variable Tgran      index 0.006
+variable Pconf      index 2.0
+variable seed       index 12345
+variable label      index tracktest
+variable nequil     index 20000
+variable ntrack     index 3000
+variable dump_every index 10
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        0.001
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+compute         tbias all temp/deform
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+compute         press all pressure tbias
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+
+variable        P equal (c_press[1]+c_press[2])/2.0
+
+thermo_style    custom step v_P c_tbias
+thermo          2000
+
+log             log.${label} append
+
+# standard equilibration, same as the production runs
+run             ${nequil}
+
+# now switch to high-frequency per-atom kinematics dump
+# (contacts and relative tangential sliding are reconstructed in Python
+# from raw positions/velocities/omega -- more robust than trying to
+# ID-match two separate LAMMPS local computes, which turned out to be
+# unreliable)
+dump            trackdump all custom ${dump_every} dump.atoms.${label} id x y vx vy omegaz radius
+dump_modify     trackdump first yes sort id
+
+print           "=== BEGIN CONTACT TRACKING ${label} ==="
+run             ${ntrack}
+print           "DONE label=${label} mu_g=${mu_g} Tgran=${Tgran} seed=${seed}"

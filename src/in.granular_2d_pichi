@@ -1,0 +1,125 @@
+# The THIRD lever on chi: the pressure lever, with contact forces dumped.
+#
+# WHY. chi (the Coulomb-mobilized contact fraction) is the only microstructural
+# candidate left standing. Once the window systematic is carried, its two-lever
+# discrepancy is 1.4 sigma -- not falsified, where the other eight candidates
+# sit at 2.7-3.5 sigma. But that test only has power against discrepancies
+# above 0.065 in n, against an n-span of 0.143, so it cannot separate "chi is a
+# state function" from "chi is wrong by up to 45% of the range". A third lever
+# decides it.
+#
+# Pressure is the right third lever: it is orthogonal to BOTH friction and
+# stiffness, and it spans 10x here. The existing pressure scan cannot be
+# reused -- those runs dumped no contact data, so chi was never measurable on
+# them. Hence this input.
+#
+# WHAT IT COMBINES.
+#   * the corrected pressure scalings of in.granular_2d_piscan, so that moving
+#     P moves kappa = E/P and NOTHING else:
+#         gdot   ~ sqrt(P)     holds I fixed
+#         t_damp ~ 1/sqrt(P)   holds Pi_damp fixed  <-- passed in, NOT the
+#                              hardcoded 0.5 of the tracking inputs; getting
+#                              this wrong is what made the first pressure
+#                              lever look physically impossible
+#         Tgran  ~ P           holds the dimensionless Theta window fixed
+#         dt     ~ 1/sqrt(P)   fixed strain per step count
+#   * the per-contact force dump of in.contact_tracking_forces_2d, in the SAME
+#     column layout so the same parsers work:
+#         0 index, 1 id1, 2 id2, 3 dist, 4 dx, 5 dy, 6 fx, 7 fy,
+#         8 ftx, 9 fty, 10 |ft|
+#     The NORMAL force is columns 6:8. Columns 4:6 are the separation vector;
+#     reading those as force silently turns the Coulomb threshold into
+#     mu_g*|d| ~ mu_g, which is meaningless and has bitten this project once.
+#   * a full thermo block with the measurement-window marker, so n(Theta_0)
+#     and chi come from the SAME runs rather than from separately matched
+#     ones. That removes a matching assumption the earlier two-lever tests had
+#     to make.
+#
+# The contact dump is deliberately sparse (cdump_every ~ nmeas/8). chi is a
+# steady-state average over ~8000 contacts, so 8 frames per run x 2 seeds is
+# ample, and it keeps the campaign's dump volume near 1 GB instead of 30.
+#
+# Usage:
+#   lmp -in in.granular_2d_pichi -var datafile data.pi_seed1 -var mu_g 0.1 \
+#       -var Pconf 50.0 -var gdot 2.236e-3 -var tdamp 0.2236 \
+#       -var Tgran 0.015 -var dt 4.472e-4 -var seed 1 -var label p50_mu0.1
+
+variable datafile    index data.granular
+variable mu_g        index 0.3
+variable gdot        index 1.0e-3
+variable Tgran       index 0.003
+variable Pconf       index 10.0
+variable tdamp       index 0.5
+variable dt          index 0.001
+variable seed        index 12345
+variable label       index pichi
+variable nequil      index 40000
+variable nmeas       index 80000
+variable cdump_every index 10000
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+# overlap relaxation
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        ${dt}
+thermo          1000
+thermo_style    custom step ke
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+# shear + thermostat + barostat
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+compute         tbias all temp/deform
+fix             therm all langevin ${Tgran} ${Tgran} ${tdamp} ${seed} zero yes
+fix_modify      therm temp tbias
+compute         press all pressure tbias
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+fix_modify      baro press press
+
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+
+variable        P      equal (c_press[1]+c_press[2])/2.0
+variable        tau    equal c_press[4]
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+variable        Zc     equal c_Zbulk
+variable        Thnd   equal c_tbias/v_P
+
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner v_Zc v_Thnd
+thermo          2000
+log             log.${label} append
+
+run             ${nequil}
+
+# per-contact geometry + normal and tangential forces
+compute         cid all property/local patom1 patom2
+compute         cpl all pair/local dist dx dy fx fy p1 p2 p4
+dump            contactdump all local ${cdump_every} dump.contacts.${label} &
+                index c_cid[1] c_cid[2] c_cpl[1] c_cpl[2] c_cpl[3] &
+                c_cpl[4] c_cpl[5] c_cpl[6] c_cpl[7] c_cpl[8]
+dump_modify     contactdump first yes
+
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} Pconf=${Pconf} tdamp=${tdamp} Tgran=${Tgran} Z=$(c_Zbulk)"

@@ -1,0 +1,122 @@
+# FROZEN-ROTATION variant of in.granular_2d (campaign item 9).
+#
+# Framework 3 (the "rotational channel") holds that friction opens a new
+# relaxation channel absent at mu_g = 0: frictionless disks spin freely and
+# decoupled, while any mu_g > 0 meshes spin to translation and introduces
+# loop frustration on odd contact cycles. That is a natural source of the
+# near-threshold rise in n at small friction, and it exists identically in
+# 2D and 3D -- unlike the original Z_2 argument.
+#
+# It is the last untested framework: the kinematic mechanisms (sliding
+# velocity, persistence time, reorientation rate, and its strong/weak
+# refinement), the force-weighted fabric, generalised isostaticity, and force
+# heterogeneity have all now been tested and none survives in both dimensions.
+#
+# Test: disable grain rotation entirely. If the rise in n(mu_g) survives with
+# rotations frozen, framework 3 is dead. If the rise vanishes, rotations are
+# the culprit -- which would be the campaign's one positive mechanism.
+#
+# HOW ROTATION IS FROZEN
+# fix nph  (NOT fix nph/sphere) and fix nve (NOT fix nve/sphere): the
+# non-sphere integrators advance translation only and never touch omega, so
+# with omega zeroed after relaxation it stays exactly zero. Verified: max
+# |omega_z| = 0 for the whole run. This is also why the usual warning does not
+# apply here -- that warning is about combining plain nph
+# WITH nve/sphere, which double-integrates translation; using nph alone does
+# not.
+#
+# Everything else -- contact model, shear, thermostat, barostat, packing,
+# observables -- is identical to in.granular_2d so the comparison is clean.
+
+
+variable datafile index data.granular
+variable mu_g     index 0.1
+variable gdot     index 1.0e-3
+variable Tgran    index 0.02
+variable Pconf    index 0.05
+variable seed     index 12345
+variable label    index test
+variable nequil   index 40000
+variable nmeas    index 80000
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+# pair style: Hertzian normal contact + Coulomb-limited (Mindlin)
+# tangential history, friction coefficient mu_g. Coefficients:
+#   normal:  Hertzian, effective modulus 1.0e5, Poisson 0.3, restitution 0.5
+#   tangential: mindlin, tangential stiffness ratio auto (NULL), damping 1.0,
+#               friction coefficient mu_g
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+# initial relaxation: settle overlaps, no shear
+fix             integrate all nve
+fix             damp all viscous 1.0
+timestep        0.001
+thermo          500
+thermo_style    custom step ke
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+# Lees-Edwards simple shear via triclinic box deformation
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+
+# ---- bias-corrected granular temperature: removes the affine shear
+# streaming velocity so thermostat + diagnostics see non-affine motion only
+compute         tbias all temp/deform
+
+# thermostat the fluctuation temperature only (independent of I)
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+
+# stress tensor / pressure (bias-corrected)
+compute         press all pressure tbias
+
+# ---- constant-pressure ensemble: barostat only the y box length to hold
+# the confining pressure Pconf fixed, decoupled from the imposed xy shear
+# (fix deform above only touches the xy tilt factor, not Ly, so the two
+# do not fight over the same degree of freedom). This is what keeps the
+# inertial number I fixed while Theta is scanned via Tgran -- without it,
+# raising Tgran inflates the measured pressure at fixed box area and I
+# drifts by up to 7x across a Theta sweep, confounding the n(mu_g) fit.
+fix             baro all nph y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+fix_modify      baro press press
+
+variable        P      equal (c_press[1]+c_press[2])/2.0
+variable        tau    equal c_press[4]
+# fix deform's xy erate convention makes tau come out negative here; only
+# the magnitude is physical, so mu is defined from |tau|
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5   # nominal mean radius (matches gen_data.py default range)
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+
+# per-contact geometry dump for the fabric tensor (post-processed)
+compute         pl all pair/local dx dy dz fx fy
+dump            contacts all local 5000 dump.contacts.${label} index c_pl[1] c_pl[2] c_pl[4] c_pl[5]
+dump_modify     contacts first no
+
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner
+thermo          1000
+
+log             log.${label} append
+
+run             ${nequil}
+
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} gdot=${gdot} Tgran=${Tgran} seed=${seed}"

@@ -1,0 +1,105 @@
+# 2D sheared granular flow with VARIABLE grain stiffness, at fixed k_t/k_n.
+#
+# WHY: n is known to depend on tangential stiffness k_t (item 10, and the
+# 432-cell grid) AND on the thermostat damping time (Tier 0-A). Both are
+# TIMESCALES, not geometry -- which is the main hint left after the geometric
+# theory failed constraint 1 (n(mu_g=0) is dimension-independent). This input
+# separates the two candidate explanations:
+#
+#   * a pure stiffness-RATIO effect (tangential elasticity per se), or
+#   * a contact-DURATION effect (how long a contact lasts relative to the
+#     shear and agitation timescales).
+#
+# Scaling the material modulus Emod with `tangential mindlin NULL` moves both
+# k_n and k_t together -- LAMMPS derives k_t = 8*G_eff from Emod -- so the
+# ratio k_t/k_n stays pinned at 1.235 while the contact time changes as
+# E^(-2/5). If n moves here, it is a timescale, and the k_t and tdamp
+# dependences are plausibly the same effect. If n is flat, the k_t dependence
+# is genuinely about tangential elasticity and tdamp is a separate problem.
+#
+# The timestep and step counts must be supplied scaled (see
+# in.granular_2d_stiff.py) so every run covers the same physical duration and
+# hence the same accumulated strain.
+#
+# Note this also varies the dimensionless stiffness kappa = Emod/P over 1e3 to
+# 1e5 at Pconf=10, i.e. it spans soft-grain to near-rigid-grain. Z is expected
+# to fall as grains stiffen (smaller overlaps), so Z is logged for the record.
+#
+# Usage:
+#   lmp -in in.granular_2d_stiff -var datafile data.q -var mu_g 0.3 \
+#       -var Emod 3.0e5 -var dt 0.00064439401 -var nrelax 4656 \
+#       -var nequil 62074 -var nmeas 124148 -var Tgran 0.003 -var seed 1 \
+#       -var Pconf 10.0 -var gdot 1.0e-3 -var label s_E3e5
+
+variable datafile index data.granular
+variable mu_g     index 0.3
+variable gdot     index 1.0e-3
+variable Tgran    index 0.003
+variable Pconf    index 10.0
+variable seed     index 12345
+variable label    index stiff
+variable Emod     index 1.0e5
+variable dt       index 0.001
+variable nrelax   index 3000
+variable nequil   index 40000
+variable nmeas    index 80000
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+# k_t = NULL -> derived from Emod, so k_t/k_n is INVARIANT as Emod scales.
+pair_style      granular
+pair_coeff      * * hertz/material ${Emod} 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        ${dt}
+thermo          1000
+thermo_style    custom step ke
+run             ${nrelax}
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+compute         tbias all temp/deform
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+compute         press all pressure tbias
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+fix_modify      baro press press
+
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+
+variable        P      equal (c_press[1]+c_press[2])/2.0
+variable        tau    equal c_press[4]
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+variable        Zc     equal c_Zbulk
+
+compute         pl all pair/local dx dy dz fx fy
+dump            contacts all local 5000 dump.contacts.${label} index c_pl[1] c_pl[2] c_pl[4] c_pl[5]
+dump_modify     contacts first no
+
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner v_Zc
+thermo          2000
+log             log.${label} append
+
+run             ${nequil}
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} Emod=${Emod} Tgran=${Tgran} seed=${seed} Z=$(c_Zbulk)"

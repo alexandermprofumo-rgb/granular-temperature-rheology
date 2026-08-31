@@ -1,0 +1,96 @@
+# in.granular_2d_stiff_ss: STEADY-STATE variant of in.granular_2d_stiff.
+#
+# The lever sweeps all ran to total shear strain 0.12, where mu is still rising
+# ~15% inside the measurement window and the size of that transient depends on
+# Theta. That biases n by up to 0.06, friction-dependently -- and a two-lever
+# test compares n at two different (E, P, k_t) states, each measured at a
+# different fraction of its OWN convergence. So constraints 7-10 and the whole
+# "no state function" corollary are the results most exposed to it, not the
+# least.
+#
+# Changes, identical to in.granular_2d_ss:
+#   * strain 0.5 equilibration + 0.5 measurement (nequil/nmeas supplied by the
+#     run script, computed from dt so every deck reaches the same STRAIN rather
+#     than the same step count)
+#   * contact dump carries the tangential force (p1,p2 vector, p4 magnitude),
+#     so a_t and chi are measured rather than closed
+#     columns: index id1 id2 dist dx dy fx fy ftx fty ftmag
+#   * fix nve/sphere disc + fix nph/sphere disc + fix enforce2d
+
+variable datafile index data.granular
+variable mu_g     index 0.3
+variable gdot     index 1.0e-3
+variable Tgran    index 0.003
+variable Pconf    index 10.0
+variable seed     index 12345
+variable label    index stiff
+variable cdump_every index 25000
+variable Emod     index 1.0e5
+variable dt       index 0.001
+variable nrelax   index 3000
+variable nequil   index 40000
+variable nmeas    index 80000
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+# k_t = NULL -> derived from Emod, so k_t/k_n is INVARIANT as Emod scales.
+pair_style      granular
+pair_coeff      * * hertz/material ${Emod} 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+fix             integrate all nve/sphere disc
+fix             damp all viscous 1.0
+timestep        ${dt}
+thermo          1000
+thermo_style    custom step ke
+run             ${nrelax}
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+compute         tbias all temp/deform
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+compute         press all pressure tbias
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran} disc
+fix_modify      baro press press
+fix             flat all enforce2d
+
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+
+variable        P      equal (c_press[1]+c_press[2])/2.0
+variable        tau    equal c_press[4]
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+variable        Zc     equal c_Zbulk
+
+compute         cid all property/local patom1 patom2
+compute         cpl all pair/local dist dx dy fx fy p1 p2 p4
+dump            contacts all local ${cdump_every} dump.contacts.${label} &
+                index c_cid[1] c_cid[2] c_cpl[1] c_cpl[2] c_cpl[3] &
+                c_cpl[4] c_cpl[5] c_cpl[6] c_cpl[7] c_cpl[8]
+dump_modify     contacts first no
+
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner v_Zc
+thermo          2000
+log             log.${label} append
+
+run             ${nequil}
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} Emod=${Emod} Tgran=${Tgran} seed=${seed} Z=$(c_Zbulk)"

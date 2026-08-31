@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "Granular temperature and the inertial number in dense granular flow"
+abstract: >-
+  Simulation and analysis code for a discrete-element study of the dependence
+  of effective friction on granular temperature at fixed inertial number.
+authors:
+  - family-names: Profumo
+    given-names: Alexander
+license: MIT
+repository-code: "https://github.com/alexandermprofumo-rgb/granular-temperature-rheology"
+preferred-citation:
+  type: article
+  title: >-
+    Grain friction breaks the separability of granular temperature and
+    inertial number in dense granular flow
+  authors:
+    - family-names: Profumo
+      given-names: Alexander
+  year: 2026
+  # journal / volume / doi: fill in on acceptance

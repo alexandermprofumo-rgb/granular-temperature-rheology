@@ -1,0 +1,131 @@
+# in.granular_2d_sens_ss: STEADY-STATE variant of in.granular_2d_sens.
+#
+# The lever sweeps all ran to total shear strain 0.12, where mu is still rising
+# ~15% inside the measurement window and the size of that transient depends on
+# Theta. That biases n by up to 0.06, friction-dependently -- and a two-lever
+# test compares n at two different (E, P, k_t) states, each measured at a
+# different fraction of its OWN convergence. So constraints 7-10 and the whole
+# "no state function" corollary are the results most exposed to it, not the
+# least.
+#
+# Changes, identical to in.granular_2d_ss:
+#   * strain 0.5 equilibration + 0.5 measurement (nequil/nmeas supplied by the
+#     run script, computed from dt so every deck reaches the same STRAIN rather
+#     than the same step count)
+#   * contact dump carries the tangential force (p1,p2 vector, p4 magnitude),
+#     so a_t and chi are measured rather than closed
+#     columns: index id1 id2 dist dx dy fx fy ftx fty ftmag
+#   * fix nve/sphere disc + fix nph/sphere disc + fix enforce2d
+
+variable datafile index data.granular
+variable mu_g     index 0.1
+variable gdot     index 1.0e-3
+variable Tgran    index 0.02
+variable Pconf    index 0.05
+variable seed     index 12345
+variable label    index test
+variable cdump_every index 25000
+variable nequil   index 40000
+variable nmeas    index 80000
+variable e_rest   index 0.5     # restitution (production 0.5)
+variable kt_spec  index NULL    # tangential stiffness; NULL = derive from kn
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+# pair style: Hertzian normal contact + Coulomb-limited (Mindlin)
+# tangential history, friction coefficient mu_g. Coefficients:
+#   normal:  Hertzian, effective modulus 1.0e5, Poisson 0.3, restitution 0.5
+#   tangential: mindlin, tangential stiffness ratio auto (NULL), damping 1.0,
+#               friction coefficient mu_g
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 ${e_rest} tangential mindlin ${kt_spec} 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+# initial relaxation: settle overlaps, no shear
+fix             integrate all nve/sphere disc
+fix             damp all viscous 1.0
+timestep        0.001
+thermo          500
+thermo_style    custom step ke
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+# Lees-Edwards simple shear via triclinic box deformation
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+
+# ---- bias-corrected granular temperature: removes the affine shear
+# streaming velocity so thermostat + diagnostics see non-affine motion only
+compute         tbias all temp/deform
+
+# thermostat the fluctuation temperature only (independent of I)
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+
+# stress tensor / pressure (bias-corrected)
+compute         press all pressure tbias
+
+# ---- constant-pressure ensemble: barostat only the y box length to hold
+# the confining pressure Pconf fixed, decoupled from the imposed xy shear
+# (fix deform above only touches the xy tilt factor, not Ly, so the two
+# do not fight over the same degree of freedom). This is what keeps the
+# inertial number I fixed while Theta is scanned via Tgran -- without it,
+# raising Tgran inflates the measured pressure at fixed box area and I
+# drifts by up to 7x across a Theta sweep, confounding the n(mu_g) fit.
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran} disc
+fix_modify      baro press press
+fix             flat all enforce2d
+
+variable        P      equal (c_press[1]+c_press[2])/2.0
+variable        tau    equal c_press[4]
+# fix deform's xy erate convention makes tau come out negative here; only
+# the magnitude is physical, so mu is defined from |tau|
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5   # nominal mean radius (matches gen_data.py default range)
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+
+# per-contact geometry dump for the fabric tensor (post-processed)
+compute         cid all property/local patom1 patom2
+compute         cpl all pair/local dist dx dy fx fy p1 p2 p4
+dump            contacts all local ${cdump_every} dump.contacts.${label} &
+                index c_cid[1] c_cid[2] c_cpl[1] c_cpl[2] c_cpl[3] &
+                c_cpl[4] c_cpl[5] c_cpl[6] c_cpl[7] c_cpl[8]
+dump_modify     contacts first no
+
+# coordination number, so the jamming gate (analyze_jamming_gate.py) can be
+# applied to this arm too -- nfit's three gates do not notice unjamming, and
+# the high-friction cells sit within ~1% of their isostatic threshold.
+# rotational granular temperature
+# Theta as thermostatted and reported is TRANSLATIONAL only (compute
+# temp/deform); rotation is never thermostatted and has never been measured.
+# Now that n is known to vanish with friction -- and friction is precisely what
+# couples translation to rotation -- Theta_rot is the most natural control
+# variable that has never been on the candidate list.
+compute         erot all erotate/sphere
+variable        Trot  equal 2.0*c_erot/(count(all))
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+variable        Zc     equal c_Zbulk
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner v_Zc v_Trot
+thermo          1000
+
+log             log.${label} append
+
+run             ${nequil}
+
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} gdot=${gdot} Tgran=${Tgran} seed=${seed}"

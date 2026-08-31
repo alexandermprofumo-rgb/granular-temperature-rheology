@@ -1,0 +1,108 @@
+# 2D sheared granular flow with EVERY dimensionless group held fixed except
+# kappa = E/P.  The corrected pressure lever.
+#
+# The original pressure lever (Result 6) was abandoned as physically
+# impossible: holding I fixed forces gdot ~ sqrt(P), and the resulting shear
+# heating overwhelmed the thermostat (at Pconf=50 the measured Theta was
+# 6x its setpoint and non-monotonic). The stated conclusion was that escaping
+# it needs a stronger bath, but since n depends on t_damp that would change
+# the physics.
+#
+# That conflated a DIMENSIONAL parameter with a DIMENSIONLESS group. n depends
+# on Pi_damp = t_damp*sqrt(P/rho)/d, not on t_damp in absolute time units.
+# t_damp = 0.5 was hardcoded everywhere, so raising P silently RAISED Pi_damp
+# -- a bath that damps slowly compared to grain dynamics -- precisely where
+# shear heating was strongest. Holding Pi_damp fixed instead means t_damp must
+# FALL as 1/sqrt(P), giving a stiffer bath at higher pressure. That is not a
+# change of physics; it is what keeping the physics fixed actually requires.
+#
+# Four quantities therefore scale together with pressure:
+#   gdot   ~ sqrt(P)     holds I = gdot*d*sqrt(rho/P) fixed
+#   t_damp ~ 1/sqrt(P)   holds Pi_damp fixed
+#   Tgran  ~ P           holds the DIMENSIONLESS Theta = rho<dv^2>/P window
+#                        fixed. Note the code's `Theta` output is the raw
+#                        LAMMPS temperature c_tbias, not Theta itself; within
+#                        one pressure the constant drops out of the log-slope,
+#                        but across pressures the same Tgran grid would sample
+#                        a different dimensionless window, and mu(Theta) has
+#                        measurable curvature.
+#   dt     ~ 1/sqrt(P)   conservative for stability, and since gdot ~ sqrt(P)
+#                        the product dt*gdot is invariant, so a fixed step
+#                        count covers a fixed STRAIN.
+#
+# With those, a pressure scan moves kappa alone and nothing else.
+#
+# Usage:
+#   lmp -in in.granular_2d_piscan -var datafile data.q -var mu_g 0.3 \
+#       -var Pconf 50.0 -var gdot 2.236e-3 -var tdamp 0.2236 \
+#       -var Tgran 0.10 -var dt 4.472e-4 -var seed 1 -var label p50
+
+variable datafile index data.granular
+variable mu_g     index 0.3
+variable gdot     index 1.0e-3
+variable Tgran    index 0.003
+variable Pconf    index 10.0
+variable tdamp    index 0.5
+variable dt       index 0.001
+variable seed     index 12345
+variable label    index piscan
+variable nequil   index 40000
+variable nmeas    index 80000
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        ${dt}
+thermo          1000
+thermo_style    custom step ke
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+compute         tbias all temp/deform
+fix             therm all langevin ${Tgran} ${Tgran} ${tdamp} ${seed} zero yes
+fix_modify      therm temp tbias
+compute         press all pressure tbias
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+fix_modify      baro press press
+
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+
+variable        P      equal (c_press[1]+c_press[2])/2.0
+variable        tau    equal c_press[4]
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+variable        Zc     equal c_Zbulk
+# dimensionless granular temperature, reported explicitly so the scanned
+# window can be verified as matched across pressures rather than assumed
+variable        Thnd   equal c_tbias/v_P
+
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner v_Zc v_Thnd
+thermo          2000
+log             log.${label} append
+
+run             ${nequil}
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} Pconf=${Pconf} tdamp=${tdamp} Tgran=${Tgran} Z=$(c_Zbulk)"

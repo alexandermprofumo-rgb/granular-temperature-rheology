@@ -1,0 +1,43 @@
+variable datafile index data.m2d_seed1
+variable mu_g  index 0.3
+variable gdot  index 1.0e-3
+variable Tgran index 0.003
+variable Pconf index 10.0
+units lj
+dimension 2
+atom_style sphere
+boundary p p p
+newton off
+read_data ${datafile}
+pair_style granular
+pair_coeff * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+neighbor 0.3 bin
+neigh_modify every 1 delay 0 check yes
+comm_modify vel yes
+fix integrate all nve/sphere
+fix damp all viscous 1.0
+timestep 0.001
+thermo 1000
+thermo_style custom step ke
+run 3000
+unfix damp
+unfix integrate
+velocity all set 0.0 0.0 0.0
+reset_timestep 0
+change_box all triclinic
+fix shear all deform 1 xy erate ${gdot} remap v units box
+compute tbias all temp/deform
+fix therm all langevin ${Tgran} ${Tgran} 0.5 1 zero yes
+fix_modify therm temp tbias
+compute press all pressure tbias
+fix baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+fix_modify baro press press
+variable P equal (c_press[1]+c_press[2])/2.0
+variable tau equal c_press[4]
+variable muI equal abs(v_tau)/v_P
+# velocity profile in 20 y-bins, and the streaming-velocity check
+compute prof all chunk/atom bin/1d y lower 0.05 units reduced
+fix pave all ave/chunk 100 200 20000 prof vx file vprof.txt
+thermo_style custom step v_P v_muI c_tbias
+thermo 10000
+run 120000

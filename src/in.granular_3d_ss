@@ -1,0 +1,110 @@
+# STEADY-STATE 3D production deck.  Supersedes in.granular_3d.
+#
+# Same two changes as in.granular_2d_ss (there is no disc/enforce2d question in
+# 3D):
+#
+# 1. STRAIN.  in.granular_3d reaches total strain 0.12 and mu is still rising
+#    +23.9% between the first and second halves of the measurement window in
+#    99% of runs -- worse than 2D.  The 36-run convergence test
+#    (run_3d_converge.sh) saw the same thing but could only measure it at 0.7-
+#    0.8 sigma, which is why its correction should never have been applied as
+#    if it were known.  nequil/nmeas = 1e6 each: strain 1.0 and 1.0.
+#
+# 2. TANGENTIAL FORCES.  The old deck dumped `dx dy dz fx fy fz` from compute
+#    pair/local, which is purely CENTRAL.  That forced analyze_rb_3d to
+#    calibrate a prefactor k on the frictionless cells and then close
+#    A_t = mu/k - A_c - A_n at every other friction -- so A_t absorbed every
+#    error in k, A_c and A_n, and the reported 3D tangential takeover rested on
+#    a residual with a 0.022 noise floor.  p1,p2,p3 are the tangential force
+#    vector and p4 its magnitude, so A_t is measured and the EXACT split
+#    mu = mu_n + mu_t (analyze_exact_split.py) becomes available on production
+#    runs -- no prefactor, no closure, no floor.
+#      Column layout:  index id1 id2 dist dx dy dz fx fy fz ftx fty ftz ftmag
+#
+# Usage:
+#   lmp -in in.granular_3d_ss -var datafile data.q3d -var mu_g 0.1 \
+#       -var gdot 1.0e-3 -var Tgran 0.003 -var Pconf 10.0 -var seed 1 \
+#       -var label ss3d001 -var nequil 1000000 -var nmeas 1000000 \
+#       -var cdump_every 25000
+
+variable datafile index data.granular3d
+variable mu_g     index 0.0
+variable gdot     index 1.0e-3
+variable Tgran    index 0.01
+variable Pconf    index 2.0
+variable seed     index 12345
+variable label    index test3d
+variable nequil   index 1000000
+variable nmeas    index 1000000
+variable cdump_every index 25000
+
+units           lj
+dimension       3
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+pair_style      granular
+pair_coeff      * * hertz/material 1.0e5 0.3 0.5 tangential mindlin NULL 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+# initial relaxation: settle overlaps, no shear
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        0.001
+thermo          500
+thermo_style    custom step ke
+run             3000
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+# Lees-Edwards simple shear: flow in x, gradient in y, vorticity in z
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+
+compute         tbias all temp/deform
+
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+
+compute         press all pressure tbias
+
+# ---- constant-pressure ensemble: barostat only the y box length (gradient
+# direction), decoupled from the imposed xy shear and z (vorticity)
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+
+variable        P      equal (c_press[1]+c_press[2]+c_press[3])/3.0
+variable        tau    equal c_press[4]
+variable        muI    equal abs(v_tau)/v_P
+variable        Theta  equal c_tbias
+variable        rmean  equal 0.5
+variable        Iiner  equal ${gdot}*2.0*v_rmean/sqrt(v_P)
+
+# ---- per-contact geometry dump (now includes dz) for the 3D fabric tensor
+compute         cid all property/local patom1 patom2
+compute         cpl all pair/local dist dx dy dz fx fy fz p1 p2 p3 p4
+dump            contacts all local ${cdump_every} dump.contacts.${label} &
+                index c_cid[1] c_cid[2] c_cpl[1] c_cpl[2] c_cpl[3] c_cpl[4] &
+                c_cpl[5] c_cpl[6] c_cpl[7] c_cpl[8] c_cpl[9] c_cpl[10] c_cpl[11]
+dump_modify     contacts first no
+
+compute         cont all contact/atom
+compute         Zbulk all reduce ave c_cont
+variable        Zc     equal c_Zbulk
+thermo_style    custom step v_P v_tau v_muI c_tbias v_Theta v_Iiner v_Zc
+thermo          1000
+
+log             log.${label} append
+
+run             ${nequil}
+
+print           "=== BEGIN MEASUREMENT WINDOW ${label} ==="
+run             ${nmeas}
+print           "DONE label=${label} mu_g=${mu_g} gdot=${gdot} Tgran=${Tgran} seed=${seed} Z=$(c_Zbulk)"

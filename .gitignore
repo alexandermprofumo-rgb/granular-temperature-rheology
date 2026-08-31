@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# Raw simulation output.  The campaigns produce ~198 GB of per-run trajectory
+# and per-contact dumps.  These are deliberately not tracked: they exceed what
+# GitHub is for, and every number in the paper is reproducible from the derived
+# tables in data/derived/ plus the drivers in drivers/.
+# ---------------------------------------------------------------------------
+sweep_*/
+calib_Z/
+verification_run/
+audit2_scratch/
+dump.*
+log.lammps*
+*.restart
+data.granular*
+prof.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# LaTeX build products
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.toc
+paper/main.pdf
+
+# Editor swap, lock and autosave files
+.#*
+#*#
+*~
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Manuscript source is held back until the draft is final.
+# Add paper/main.tex to the commit at submission, notes stripped.
+paper/main.tex

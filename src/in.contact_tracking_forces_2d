@@ -1,0 +1,123 @@
+# Contact tracking WITH per-contact forces (2D).
+#
+# Same physical protocol as in.contact_tracking_2d (identical equilibration,
+# Lees-Edwards shear, bias-corrected Langevin thermostat, 1D barostat), but
+# additionally dumps force-resolved per-contact data, which the original
+# tracking runs did not capture.
+#
+# WHY THIS EXISTS
+# The Tier 1 analyses (strong/weak network split, the Coulomb-mobilised
+# fraction chi, the force-weighted fabric tensor F^w ~ sum f_n n n) all need
+# per-contact NORMAL and TANGENTIAL forces. Those cannot be reconstructed
+# from kinematics alone, because the Mindlin tangential force is history
+# dependent.
+#
+# The methods report notes an earlier attempt at contact-force dumping that
+# produced "identically zero" tangential forces, and attributes it to
+# entry-by-entry misalignment between compute property/local and compute
+# pair/local. That diagnosis appears to be incorrect. Direct testing on this
+# LAMMPS build shows:
+#   * the two computes DO align entry-by-entry (verified by checking that the
+#     atom pair named by property/local reproduces pair/local's own dist);
+#   * but compute pair/local's fx,fy are purely CENTRAL -- the force it
+#     reports lies exactly along n, so any tangential component computed as
+#     F - (F.n)n is identically zero by construction. That is the real cause.
+# The tangential force is instead exposed through the granular pair style's
+# own extra outputs: p1,p2,p3 are the tangential force vector (orthogonal to
+# n) and p4 its magnitude. Those are what this input dumps.
+#
+# Column layout of dump.contacts.<label>:
+#   index id1 id2 dist dx dy fx fy ft_x ft_y ft_mag
+# with normal force f_n = |(fx,fy)| (central) and |f_t| = ft_mag, so the
+# Coulomb mobilisation of a contact is |f_t| / (mu_g * f_n).
+#
+# Usage:
+#   lmp -in in.contact_tracking_forces_2d -var datafile data.q -var mu_g 0.1 \
+#       -var gdot 1.0e-3 -var Tgran 0.006 -var Pconf 2.0 -var seed 1 \
+#       -var label trk_mu0.1_T0.006 -var nequil 40000 -var ntrack 3000 \
+#       -var dump_every 15 -var cdump_every 30
+
+variable datafile     index data.q
+variable mu_g         index 0.0
+variable gdot         index 1.0e-3
+variable Tgran        index 0.006
+variable Pconf        index 2.0
+variable seed         index 12345
+variable label        index trktest
+# Emod / dt default to the production values, so existing callers are
+# unaffected; run_tracking_stiff.sh overrides them (with dt scaled as
+# E^(-2/5), see in.granular_2d_stiff.py) to measure chi at varying stiffness.
+variable Emod         index 1.0e5
+# k_t: NULL derives it from Emod (ratio pinned at 1.235). Setting it
+# explicitly moves k_t at fixed k_n, which is the ONLY lever that moves the
+# stored-energy ratio R_E = (f_t^2/k_t)/(f_n^2/k_n) strongly at fixed mu_g --
+# R_E varies 80x along friction but only 13% along Emod, so without this the
+# two-lever test on R_E has almost no power.
+variable kt_spec      index NULL
+variable dt           index 0.001
+variable nrelax       index 3000
+variable nequil       index 40000
+variable ntrack       index 3000
+variable dump_every   index 15
+variable cdump_every  index 30
+
+units           lj
+dimension       2
+atom_style      sphere
+boundary        p p p
+newton          off
+
+read_data       ${datafile}
+
+pair_style      granular
+pair_coeff      * * hertz/material ${Emod} 0.3 0.5 tangential mindlin ${kt_spec} 1.0 ${mu_g} damping tsuji
+
+neighbor        0.3 bin
+neigh_modify    every 1 delay 0 check yes
+comm_modify     vel yes
+
+# overlap relaxation (identical to the original tracking protocol)
+fix             integrate all nve/sphere
+fix             damp all viscous 1.0
+timestep        ${dt}
+run             ${nrelax}
+unfix           damp
+unfix           integrate
+velocity        all set 0.0 0.0 0.0
+reset_timestep  0
+
+# shear + thermostat + barostat (identical to production)
+change_box      all triclinic
+fix             shear all deform 1 xy erate ${gdot} remap v units box
+compute         tbias all temp/deform
+fix             therm all langevin ${Tgran} ${Tgran} 0.5 ${seed} zero yes
+fix_modify      therm temp tbias
+compute         press all pressure tbias
+fix             baro all nph/sphere y ${Pconf} ${Pconf} 1.0 ptemp ${Tgran}
+fix_modify      baro press press
+
+variable        P equal (c_press[1]+c_press[2])/2.0
+
+thermo_style    custom step v_P c_tbias
+thermo          2000
+
+log             log.${label} append
+
+run             ${nequil}
+
+# per-atom kinematics (contact tracking / reorientation, as before)
+dump            trackdump all custom ${dump_every} dump.atoms.${label} id x y vx vy omegaz radius
+dump_modify     trackdump first yes sort id
+
+# per-contact geometry + normal and tangential forces
+# p1,p2 = tangential force vector components; p4 = |f_t|
+compute         cid all property/local patom1 patom2
+compute         cpl all pair/local dist dx dy fx fy p1 p2 p4
+dump            contactdump all local ${cdump_every} dump.contacts.${label} &
+                index c_cid[1] c_cid[2] c_cpl[1] c_cpl[2] c_cpl[3] &
+                c_cpl[4] c_cpl[5] c_cpl[6] c_cpl[7] c_cpl[8]
+dump_modify     contactdump first yes
+
+print           "=== BEGIN CONTACT TRACKING ${label} ==="
+run             ${ntrack}
+print           "DONE label=${label} mu_g=${mu_g} Tgran=${Tgran} seed=${seed}"
