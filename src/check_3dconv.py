@@ -1,9 +1,8 @@
 """Reproduce section 6a (the 3D convergence correction) from sweep_3dconv.
 
-No script for this exists in RESEARCH_LAMMPS either.  run_3d_converge.sh runs
-nmeas = 400000 (5x production) at mu_g = 0, 0.3, 1.0, six Theta setpoints, two
-seeds, and n is fitted from successive quarters of the measurement
-window.  Rebuilt here.
+run_3d_converge.sh runs nmeas = 400000 (5x production) at mu_g = 0, 0.3, 1.0,
+six Theta setpoints, two seeds, and n is fitted from successive quarters of the
+measurement window.
 """
 import glob
 import os

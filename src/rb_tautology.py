@@ -75,6 +75,13 @@ def variants(path):
 
 paths = sorted(glob.glob(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'sweep_pichi', 'dump.contacts.P*')))
+if not paths:
+    raise SystemExit(
+        'No per-contact dumps found under sweep_pichi/.\n'
+        'This script needs tier-3 data, the raw per-contact dumps (~198 GB),\n'
+        'which are not distributed. See "Data, and what you need for what" in\n'
+        'the README. Nothing in the figure or constraint pipeline depends on\n'
+        'this script.')
 sel = paths[::12]
 A = []
 for p in sel:

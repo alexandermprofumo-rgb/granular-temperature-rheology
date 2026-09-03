@@ -227,7 +227,11 @@ def main():
     rows = []
     files = sorted(glob.glob(os.path.join(args.dir, 'dump.contacts.*')))
     if not files:
-        print(f'no contact dumps under {args.dir}')
+        print(f'No per-contact dumps under {args.dir}.\n'
+              'This script needs tier-3 data, the raw per-contact dumps\n'
+              '(~198 GB), which are not distributed. See "Data, and what you\n'
+              'need for what" in the README. Nothing in the figure or\n'
+              'constraint pipeline depends on this script.')
         return 1
     for i, path in enumerate(files, 1):
         label = os.path.basename(path).split('dump.contacts.', 1)[1]

@@ -1,11 +1,14 @@
-"""Static checks on main.tex, standing in for a compile we cannot run here.
+"""Static checks on main.tex, run before compiling.
 
-There is no TeX on this machine and no network to install one, so this covers
-the error classes pdflatex would catch: unbalanced environments and braces,
-unbalanced math mode, undefined references and citations, duplicate labels,
-wrong column counts, unknown macros, unescaped specials, and missing figures.
+Covers the error classes pdflatex reports only at the end of a long run, or
+reports obscurely: unbalanced environments and braces, unbalanced math mode,
+undefined references and citations, duplicate labels, wrong column counts,
+unknown macros, unescaped specials, and missing figures.
 
-It is not a substitute for compiling.  Run pdflatex before submission.
+Not a substitute for compiling.  Run pdflatex before submission.
+
+Expects main.tex alongside it; the manuscript source is added to this
+directory at submission.
 
 Usage:  python3 lint.py
 """

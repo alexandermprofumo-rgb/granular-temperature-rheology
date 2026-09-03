@@ -148,6 +148,38 @@ def main():
         cells.append(dict(mg=mg, I=np.array(Is), n=np.array(ns),
                           e=np.array(es), lm=np.array(ms), lme=np.array(mes),
                           T0=Tuse, pools=pools, win=(lo, hi)))
+
+        # MODEL-FREE two-point log-slope per arm, and within sub-windows. No
+        # fitting, so no window or degree argument is available against it. A
+        # monotonic dependence on I means slow > mid > fast; at a null cell the
+        # slow-minus-fast difference should not hold one sign across
+        # sub-windows. This is the 2D counterpart of the block in
+        # analyze_iscan3d.py and the claims in Sec. V.C depend on it.
+        arms = {}
+        for tag, I, runs in pools:
+            ts, byT = gated(runs, window=(lo, hi))
+            pts = []
+            for t in sorted(ts):
+                sel = [r for r in byT[t] if r['Theta'] > 0 and r['mu'] > 0]
+                if sel:
+                    pts.append((float(np.mean([r['Theta'] for r in sel])),
+                                float(np.mean(np.log([r['mu'] for r in sel])))))
+            arms[tag] = sorted(pts)
+        print(f'   {"model-free two-point slope":<26}'
+              + ''.join(f'{t:>10}' for t in ('slow', 'mid', 'fast'))
+              + f'{"slow-fast":>12}')
+        for lab, cut in (('lower half', lambda q: q[:max(2, len(q) // 2 + 1)]),
+                         ('upper half', lambda q: q[len(q) // 2:]),
+                         ('interior', lambda q: q[1:-1]),
+                         ('full window', lambda q: q)):
+            v = {}
+            for t in ('slow', 'mid', 'fast'):
+                q = cut(arms.get(t, []))
+                v[t] = (-(q[-1][1] - q[0][1]) / np.log(q[-1][0] / q[0][0])
+                        if len(q) >= 2 else np.nan)
+            print(f'   {lab:<26}'
+                  + ''.join(f'{v[t]:>10.4f}' for t in ('slow', 'mid', 'fast'))
+                  + f'{v["slow"]-v["fast"]:>12.4f}')
         print()
 
     if not cells:

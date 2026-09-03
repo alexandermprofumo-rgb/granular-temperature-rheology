@@ -217,5 +217,85 @@ def main():
     print('cached -> channel_state_2d.json')
 
 
+def thermo_vs_contact(T0=8.4664e-04):
+    """Do the two definitions of mu_eff give the same local slope?
+
+    WHY THIS IS A CHECK AND NOT A TAUTOLOGY. The thermodynamic mu is tau/P read
+    from the stress tensor in the LAMMPS log. The contact-stress mu is
+    (a_c+a_n+a_t)/2, built from the per-contact dumps by extract_channels. They
+    are computed from different quantities by different code paths, so their
+    agreement says the decomposition tracks the measured rheology rather than
+    re-deriving it.
+
+    Both sides are fitted at the SAME Theta_0, over the SAME gated setpoints,
+    and at the SAME polynomial degree the adaptive fit selected for the
+    thermodynamic side. Without that matching the comparison measures the
+    fitting choices instead of the physics; an earlier hand-computed version
+    quoted in the manuscript is not reproducible under any single choice.
+    """
+    import csv as _csv
+    chan = {}
+    for r in _csv.DictReader(open('chan_steady2d.csv')):
+        chan[(float(r['mu_g']), round(float(r['Tgran']), 12),
+              int(r['seed']))] = float(r['mu'])
+    RXM = r'log\.mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
+    bycell = {}
+    for p in glob.glob('sweep_steady2d/log.*'):
+        m = re.match(RXM, os.path.basename(p))
+        if not m:
+            continue
+        q = nfit.parse_log(p)
+        if not q:
+            continue
+        q['Tgran'] = float(m.group('T'))
+        q['seed'] = int(m.group('s'))
+        bycell.setdefault(float(m.group('mu')), []).append(q)
+    if not bycell:
+        print('\n  thermo vs contact: sweep_steady2d not unpacked, skipping')
+        return
+    print('\n' + '=' * 78)
+    print('THERMODYNAMIC vs CONTACT-STRESS SLOPE   (same gate, setpoints, degree)')
+    print('=' * 78)
+    print(f'  {"mu_g":>6} {"n (thermo)":>19} {"n (contact)":>19} {"diff":>9} {"sig":>5}')
+    sig = []
+    for mg in sorted(bycell):
+        runs = bycell[mg]
+        Ts, byT = nfit.surviving_setpoints(runs, z_min=ZMIN)
+        K = [t for t in Ts if not [x['Z'] for x in byT[t] if 'Z' in x]
+             or np.mean([x['Z'] for x in byT[t] if 'Z' in x]) >= ZMIN]
+        if len(K) < 4:
+            continue
+        th = nfit.fit_local_sys(runs, T0, fn=nfit.fit_local_adaptive,
+                                restrict_to=K, z_min=ZMIN)
+        if not th:
+            continue
+        keep = {round(t, 12) for t in K}
+        sel = [(r['Theta'], chan.get((mg, round(r['Tgran'], 12), r['seed'])))
+               for r in runs if round(r['Tgran'], 12) in keep]
+        sel = [(t, m) for t, m in sel if m and m > 0 and t > 0]
+        if len(sel) < 6:
+            continue
+        x = np.log([t for t, _ in sel]) - np.log(T0)
+        y = np.log([m for _, m in sel])
+        deg = th.get('deg', 2)
+        A = np.vander(x, deg + 1, increasing=True)
+        c = np.linalg.lstsq(A, y, rcond=None)[0]
+        resid = y - A @ c
+        dof = len(y) - A.shape[1]
+        if dof < 1:
+            continue
+        cov = float(resid @ resid) / dof * np.linalg.inv(A.T @ A)
+        ncs, ecs = -c[1], float(np.sqrt(cov[1, 1]))
+        d = th['n'] - ncs
+        e = float(np.hypot(th['tot'], ecs))
+        sig.append(abs(d) / e)
+        print(f'  {mg:>6} {th["n"]:>11.4f}+/-{th["tot"]:.4f} '
+              f'{ncs:>11.4f}+/-{ecs:.4f} {d:>+9.4f} {abs(d)/e:>5.1f}')
+    if sig:
+        print(f'\n  {len(sig)} cells; max {max(sig):.1f} sigma, '
+              f'median {np.median(sig):.1f} sigma')
+
+
 if __name__ == '__main__':
     main()
+    thermo_vs_contact()

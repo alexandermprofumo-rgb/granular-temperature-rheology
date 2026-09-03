@@ -170,6 +170,45 @@ def main():
             e2 = float(np.hypot(Rr[pk].get('comb', Rr[pk]['tot']), Rr[1.0].get('comb', Rr[1.0]['tot'])))
             line += f', fall {sig(Rr[pk]["n"]-Rr[1.0]["n"], e2):.1f} sigma'
         print(line)
+        # WINNER'S CURSE. The peak is the max over the sampled frictions, so
+        # both its height and its location are selected on noise. This was
+        # previously computed only in check_final.py, on ungated quadratic
+        # fits, and drifted out of date; it belongs here, on the same fits the
+        # constraint uses. The location distribution is the more important
+        # output: where it is not concentrated, the peak position is not a
+        # result and should not be quoted.
+        # Reported over TWO friction sets. The constraint list samples CORE;
+        # Fig. 4(a) plots every friction in the sweep, and in 3D the plotted
+        # set contains a cell (mu_g = 0.4) larger than the CORE maximum. Sec.
+        # IV.B quotes the plotted set, so both must be computed here or that
+        # sentence traces to nothing.
+        C_all = S[tag][0]
+        D_ = S[tag][1]
+        R_all = {}
+        for m in sorted(C_all):
+            ts_ = jammed(C_all[m], D_ + 1)
+            if len(ts_) < 4:
+                continue
+            r_ = nfit.fit_local_sys(C_all[m], T0, fn=nfit.fit_local_adaptive,
+                                    restrict_to=ts_, z_min=D_ + 1)
+            if r_:
+                R_all[m] = float(np.hypot(r_['tot'], r_.get('sys_deg', 0.0))), r_['n']
+        for setname, pairs in (('CORE', [(m, Rr[m].get('comb', Rr[m]['tot']),
+                                          Rr[m]['n']) for m in sorted(Rr)]),
+                               ('plotted', [(m, e_, n_)
+                                            for m, (e_, n_) in sorted(R_all.items())])):
+            ms = [p[0] for p in pairs]
+            es = np.array([p[1] for p in pairs])
+            ns = np.array([p[2] for p in pairs])
+            rng = np.random.default_rng(3)
+            draws = ns[None, :] + rng.normal(0, es, size=(20000, len(ms)))
+            am = draws.argmax(axis=1)
+            bias = float(np.mean(draws.max(axis=1) - ns[am]))
+            loc = np.bincount(am, minlength=len(ms)) / len(am)
+            top = ', '.join(f'{ms[i]:g}:{loc[i]:.0%}'
+                            for i in np.argsort(-loc) if loc[i] >= 0.05)
+            print(f'    selection bias, {setname:<7} ({len(ms)} frictions): '
+                  f'height biased high by {bias:+.4f}; argmax at  {top}')
     p2 = max(R['2D'], key=lambda m: R['2D'][m]['n'])
     p3 = max(R['3D'], key=lambda m: R['3D'][m]['n'])
     e2v = R['2D'][p2]['n'] - R['2D'][0.0]['n']

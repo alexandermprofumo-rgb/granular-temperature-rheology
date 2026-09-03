@@ -172,7 +172,9 @@ def micro_lookup(path, extra=None):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--out', default='master_n.csv')
+    # Writes under derived/ so a rerun does not overwrite the tracked table
+    # that ships with the repository. Pass --out to override.
+    ap.add_argument('--out', default='derived/master_n.csv')
     args = ap.parse_args()
     rows = []
 
@@ -224,6 +226,7 @@ def main():
             kt_kn=KT_KN_DEFAULT, chi=np.nan, Z=np.nan, n=n, n_err=e)
 
     flds = ['source', 'D', 'mu_g', 'Pconf', 'kappa', 'kt_kn', 'chi', 'Z', 'n', 'n_err']
+    os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with open(args.out, 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=flds, restval='')
         w.writeheader()

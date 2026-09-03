@@ -116,7 +116,9 @@ def collect(d):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dir', default='sweep_sens')
-    ap.add_argument('--out', default='ktgrid_results.csv')
+    # Writes under derived/ so a rerun does not overwrite the tracked table
+    # that ships with the repository. Pass --out to override.
+    ap.add_argument('--out', default='derived/ktgrid_results.csv')
     args = ap.parse_args()
 
     rows = [r for r in collect(args.dir) if abs(r['e_rest'] - 0.5) < 1e-9]
@@ -124,6 +126,7 @@ def main():
         print('no runs found')
         return
 
+    os.makedirs(os.path.dirname(args.out) or '.', exist_ok=True)
     with open(args.out, 'w', newline='') as f:
         w = csv.DictWriter(f, fieldnames=sorted(rows[0].keys()))
         w.writeheader()

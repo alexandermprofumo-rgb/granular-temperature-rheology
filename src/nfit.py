@@ -121,8 +121,11 @@ def surviving_setpoints(runs, i_tol=I_TOL, p_tol=P_TOL, restrict_to=None,
 
     WHAT IT CATCHES. Surveyed over all 531 gated 2D+3D production runs, exactly
     4 are sub-isostatic while their setpoint mean still clears the gate -- all
-    in 2D, all at the coldest setpoint Tgran = 5e-4, where least agitation
-    leaves a pack able to stick in an under-coordinated metastable state:
+    in 2D. Three are at the coldest setpoint Tgran = 5e-4, where least agitation
+    leaves a pack able to stick in an under-coordinated metastable state; the
+    fourth is a boundary case at Tgran = 3e-3 and is marked below. (The
+    manuscript says three for this reason; do not "correct" it from an earlier
+    version of this comment, which said all four.)
 
         mu_g = 0.1   seed 2   Z = 2.63 vs partners ~4.08   mu +19.1%
         mu_g = 0.15  seed 1   Z = 2.61 vs partners ~4.06   mu +26.5%
@@ -147,8 +150,9 @@ def surviving_setpoints(runs, i_tol=I_TOL, p_tol=P_TOL, restrict_to=None,
         # optional. Filtering runs alone cherry-picks: at a setpoint straddling
         # the threshold it keeps whichever realisation landed a hair above and
         # admits a state the mean gate correctly rejected. Surveyed over all ten
-        # sweeps, run-filtering alone removes 5 genuinely bad runs and wrongly
-        # admits 10 such setpoints -- twice as much harm as good.
+        # sweeps, run-filtering alone removes 4 genuinely bad runs and wrongly
+        # admits 10 such setpoints -- more harm than good. Computed by
+        # analyze_jamming_gate.majority_rule_audit(); do not edit by hand.
         #
         # So: a setpoint survives only if a STRICT MAJORITY of its runs are
         # jammed, and it then carries just those runs. A minority surviving is

@@ -18,7 +18,7 @@ WHICH THRESHOLD? Isostaticity is friction-dependent: 2D counting gives
 Z_iso = 4 frictionless (1 constraint per contact, 2 DOF per grain) and
 Z_iso = 3 for non-sliding frictional contacts (2 constraints, 3 DOF); in 3D,
 6 and 4. Rather than pick one, this reports the constraint list under three
-thresholds and shows the movement, which is what a referee will want.
+thresholds and shows the movement.
 
 Usage:  python3 analyze_jamming_gate.py
 """
@@ -133,5 +133,76 @@ def main():
               f'because the window moves)')
 
 
+MARGIN = 0.02   # 'marginal' = within this of the threshold
+RX_ANY = re.compile(r'log\..*_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$')
+
+
+def _any_cells(d):
+    """Group a sweep's runs by every label except the setpoint and the seed.
+
+    cells() above only matches log.mu*, which is the friction-scan naming. The
+    lever sweeps prefix the stiffness, pressure or tangential stiffness, so they
+    would silently contribute nothing to a survey that used it.
+    """
+    out = {}
+    for p in glob.glob(f'{d}/log.*'):
+        b = os.path.basename(p)
+        m = RX_ANY.match(b)
+        if not m:
+            continue
+        q = nfit.parse_log(p)
+        if not q:
+            continue
+        q['Tgran'] = float(m.group('T'))
+        out.setdefault(b[:m.start('T')], []).append(q)
+    return out
+
+
+def majority_rule_audit(sweeps=None, z=None):
+    """What the majority rule catches that per-run filtering alone does not.
+
+    Sec. II.D of the manuscript states that filtering runs without the majority
+    rule removes 5 sub-isostatic runs and wrongly admits 10 marginal setpoints.
+    That was a docstring in nfit.py and nothing computed it; this does.
+
+    A setpoint is "wrongly admitted" when a minority of its runs are jammed, so
+    run-filtering alone would keep it on the strength of that minority while the
+    setpoint mean correctly rejects it.
+    """
+    if sweeps is None:
+        sweeps = [('sweep_steady2d', 3.0), ('sweep_steady3d', 4.0),
+                  ('sweep_lev_E', 3.0), ('sweep_lev_P', 3.0),
+                  ('sweep_lev_kt', 3.0), ('sweep_size2d', 3.0),
+                  ('sweep_restit', 3.0), ('sweep_iscan2', 3.0),
+                  ('sweep_lev_E3d', 4.0), ('sweep_iscan3d', 4.0)]
+    removed = admitted = total = 0
+    for name, zmin in sweeps:
+        zz = z if z is not None else zmin
+        for runs in _any_cells(name).values():
+            # nfit's other three gates first: the survey is over runs that
+            # would otherwise be used, not over everything on disk.
+            Ts, byT = nfit.surviving_setpoints(runs)
+            for t in Ts:
+                rs = [r for r in byT[t] if r.get('Z') is not None]
+                if not rs:
+                    continue
+                total += len(rs)
+                jam = [r for r in rs if r['Z'] >= zz]
+                if len(jam) * 2 > len(rs):
+                    removed += len(rs) - len(jam)      # majority holds: prune
+                elif jam and any(abs(r['Z'] - zz) <= MARGIN for r in jam):
+                    admitted += 1                       # marginal minority
+    print()
+    print('=' * 78)
+    print('MAJORITY RULE: what run-filtering alone would do')
+    print('=' * 78)
+    print(f'  surveyed {total} runs across {len(sweeps)} gated sweeps')
+    print(f'  sub-isostatic runs removed where the setpoint keeps a majority: {removed}')
+    print(f'  setpoints run-filtering would wrongly admit on a minority:      {admitted}')
+    print('  With the majority rule all of the second group are rejected and')
+    print('  all of the first are removed.')
+
+
 if __name__ == '__main__':
     main()
+    majority_rule_audit()

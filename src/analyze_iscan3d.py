@@ -4,8 +4,8 @@ WHY THIS EXISTS. The paper's title claim is that mu*Theta^n = F(I) is not
 always valid, and its strongest leg is the FORM leg -- Theta and I are not
 separable, so no value of n rescues the relation. As of the 2026-08-25 audit
 that leg was 2D ONLY: every 3D run in the project sat at a single shear rate,
-I = 3.24e-4. For a relation whose exponent is claimed to depend on dimension,
-that is the first thing a referee asks for.
+I = 3.24e-4, which leaves the dimension dependence of the form failure
+untested.
 
 sweep_iscan3d supplies the two outer arms, sharing sweep_steady3d's packings so
 that the existing campaign IS the middle arm and all three are paired:
@@ -94,7 +94,7 @@ def main():
         print(f'=== mu_g = {mg}   shared window [{lo:.3e}, {hi:.3e}] = {hi/lo:.1f}x'
               f'   Theta_0 = {T0:.3e}')
 
-        rec, arms = [], {}
+        rec, arms, percell = [], {}, []
         for tag, I, runs in pools:
             ts, byT = gated(runs, window=(lo, hi))
             f = nfit.fit_local_sys(runs, T0, restrict_to=ts, z_min=ZMIN) if len(ts) >= 4 else None
@@ -103,6 +103,7 @@ def main():
                          for t in ts)
             arms[tag] = pts
             if f:
+                percell.append((f['n'], f['tot']))
                 print(f'   {tag:<5} I={I:.3e}  k={f["k"]:<3d} '
                       f'Th[{pts[0][0]:.3e},{pts[-1][0]:.3e}]  '
                       f'n = {f["n"]:+.4f} +/- {f["tot"]:.4f}')
@@ -145,6 +146,20 @@ def main():
                 Fn = ((r1 - r2) / (p2 - p1)) / (r2 / (n - p2))
                 nested = (Fn, 1 - stats.f.cdf(Fn, p2 - p1, n - p2),
                           np.sqrt(r1 / max(r2, 1e-300)))
+        # T1: is n CONSTANT across the arms? Same statistic as analyze_iscan3's
+        # T1 block, which had no 3D counterpart. Sec. V.B quotes both
+        # dimensions, and at mu_g = 0 they disagree, so the 3D value has to be
+        # computed here rather than by hand.
+        if len(percell) >= 3:
+            v = np.array([c[0] for c in percell])
+            e = np.array([c[1] for c in percell])
+            w = 1.0 / e ** 2
+            mean = float((w * v).sum() / w.sum())
+            chi2 = float((w * (v - mean) ** 2).sum())
+            print(f'   T1 constant across arms: mean {mean:+.4f}'
+                  f' +/- {1/np.sqrt(w.sum()):.4f}   chi2 = {chi2:.2f} on'
+                  f' {len(v)-1} dof   '
+                  f'{"CONSTANT" if chi2 < 6 else "NOT CONSTANT"}')
         print(f'   nested F (shared shape vs free per-arm quadratics): '
               f'F = {nested[0]:.2f}, p = {nested[1]:.1e}, '
               f'RMS penalty {nested[2]:.2f}x')
@@ -173,10 +188,10 @@ def main():
                   + f'{v["slow"]-v["fast"]:>12.4f}')
         print()
 
-    print('The 2D result for comparison (analyze_iscan3.py, T0):')
-    print('   mu_g 0    : F = 0.29,  p = 8.8e-01   separable')
-    print('   mu_g 0.15 : F = 16.31, p = 4.2e-07   NOT separable')
-    print('   mu_g 0.3  : F = 32.18, p = 2.8e-10   NOT separable')
+    # The 2D comparison is NOT reproduced here. It was, as three hardcoded
+    # F and p values, and they drifted out of date against the script that
+    # computes them. Run analyze_iscan3.py for the 2D column.
+    print('For the 2D column, run analyze_iscan3.py.')
 
 
 if __name__ == '__main__':

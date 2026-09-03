@@ -104,6 +104,39 @@ def main():
               f'{np.mean([x.get("Z", np.nan) for x in r]):>7.2f}'
               f'{np.mean([x["I"] for x in r]):>10.3e}')
 
+    # THE UNFORCED LOCUS. Without a bath, Theta is whatever shear heating and
+    # inelastic dissipation settle on, so varying gdot at fixed e traces the
+    # line an unforced flow actually follows. Two things are asserted in Sec.
+    # VII and both are checked here: that Theta ~ I^2 along it, and that
+    # mu_eff is constant along it. Together they make mu*Theta^n = F(I) hold
+    # for EVERY n on that locus, which is why an intervention like the
+    # thermostat is unavoidable rather than merely convenient. The table above
+    # contains the numbers; without this block the arithmetic was left to the
+    # reader and the claim traced to nothing.
+    print()
+    print('  THE UNFORCED LOCUS: vary gdot with no bath, at fixed e.')
+    print('  Theta ~ I^2 locks the two variables together, and mu is flat along it.')
+    loci = {}
+    for k in A:
+        kind, g, e, mg = k
+        if kind == 'nt':
+            loci.setdefault((e, mg), []).append((g, A[k]))
+    print(f'  {"e":>5}{"mu_g":>6}{"rates":>7}{"Theta span":>12}'
+          f'{"mu spread":>11}{"dlnTh/dlng":>12}')
+    for (e, mg), pts in sorted(loci.items()):
+        if len(pts) < 2:
+            continue
+        pts.sort()
+        g = np.array([p[0] for p in pts])
+        th = np.array([float(np.mean([x['Theta'] for x in p[1]])) for p in pts])
+        mu = np.array([float(np.mean([x['mu'] for x in p[1]])) for p in pts])
+        span = th.max() / th.min()
+        spread = (mu.max() - mu.min()) / mu.mean() * 100.0
+        sl = float(np.polyfit(np.log(g), np.log(th), 1)[0])
+        print(f'  {e:>5g}{mg:>6g}{len(pts):>7}{span:>11.1f}x'
+              f'{spread:>10.2f}%{sl:>12.3f}')
+    print('  (dlnTheta/dlngdot = 2 is Theta ~ gdot^2, hence Theta ~ I^2 at fixed P.)')
+
     print()
     print('  OVERLAY: the thermostatted curve (sweep_restit, same e, mu_g, gdot,')
     print('  packing) evaluated at the athermal Theta_shear.')

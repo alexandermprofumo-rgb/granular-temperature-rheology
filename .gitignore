@@ -1,9 +1,7 @@
-# ---------------------------------------------------------------------------
 # Raw simulation output.  The campaigns produce ~198 GB of per-run trajectory
 # and per-contact dumps.  These are deliberately not tracked: they exceed what
-# GitHub is for, and every number in the paper is reproducible from the derived
-# tables in data/derived/ plus the drivers in drivers/.
-# ---------------------------------------------------------------------------
+# GitHub is for, and the figures rebuild from the derived tables in src/ plus
+# the log archive on Zenodo.
 sweep_*/
 calib_Z/
 verification_run/
@@ -13,6 +11,10 @@ log.lammps*
 *.restart
 data.granular*
 prof.*
+
+# Regenerated analysis tables.  analyze_ktgrid.py and build_master_table.py
+# write here by default so a rerun does not overwrite the tracked tables.
+derived/
 
 # Python
 __pycache__/
@@ -43,6 +45,5 @@ paper/main.pdf
 .DS_Store
 Thumbs.db
 
-# Manuscript source is held back until the draft is final.
-# Add paper/main.tex to the commit at submission, notes stripped.
+# Manuscript source, added at submission.
 paper/main.tex

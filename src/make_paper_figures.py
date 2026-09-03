@@ -1,18 +1,16 @@
 """Regenerate every figure from current data. No hardcoded numbers anywhere.
 
-The previous figure scripts are stale (newest output Aug 11) and
-make_channel_figure.py carried literal S2/S3 arrays that the corrected channel
-extraction has since invalidated. Everything here is computed from the sweeps
-and the chan_*.csv caches at run time, and the numbers used are printed
-alongside each panel so they can be quoted in text without re-deriving them.
+Everything here is computed from the sweeps and the chan_*.csv caches at run
+time, and the numbers used are printed alongside each panel so they can be
+quoted in text without re-deriving them.
 
-Figures:
-  fig1_ncurve       n(mu_g), both dimensions, with the divergence above mu_g~0.2
-  fig2_frictionless the exclusion, and its finite-size convergence
-  fig3_curvature    mu(Theta) in log-log -- why n is not an exponent
-  fig4_channels     the three-channel decomposition, both dimensions
-  fig5_chi          n_c and n_n collapse on chi; n itself does not
-  fig6_validation   strain convergence, jamming gate, in-window drift
+Figures, in the order written:
+  fig1_steady       strain convergence, and Z against Theta at the jamming limit
+  fig2_curvature    mu(Theta) in log-log -- why n is not an exponent
+  fig3_frictionless the exclusion, and its finite-size convergence
+  fig4_ncurve       n(mu_g), both dimensions, with the divergence above mu_g~0.2
+  fig5_channels     the three-channel decomposition, both dimensions
+  fig6_chinull      n_c and n_n against chi; n itself does not collapse
 
 Usage:  python3 make_paper_figures.py
 """
@@ -82,20 +80,42 @@ T0 = float(np.sqrt(max(los) * min(his)))
 print(f'common Theta_0 = {T0:.4e}')
 OUT['Theta0'] = T0
 
-R2 = {m: nfit.fit_local_sys(D2[m], T0, restrict_to=K2[m], z_min=ZMIN)
+# PRIMARY ESTIMATOR (Amendment 6). These are the n(mu_g) values the paper
+# quotes, so they must come from the adaptive-degree fit, not the fixed
+# quadratic that fit_local_sys falls back to when fn is omitted. The two
+# disagree materially in 3D: the peak sits at mu_g = 0.2 under the adaptive
+# fit and at 0.3 under the quadratic.
+#
+# NOT changed to adaptive, deliberately: the finite-size series below and the
+# matched-window comparison in panel (b). Both are fixed-degree in the scripts
+# they must agree with (analyze_size_restitution.py, which is pre-registered,
+# and constraints_final.py's window_sensitivity, quadratic unless --adaptive).
+# Isolating a window systematic requires holding the degree fixed.
+R2 = {m: nfit.fit_local_sys(D2[m], T0, fn=nfit.fit_local_adaptive,
+                            restrict_to=K2[m], z_min=ZMIN)
       for m in sorted(D2) if len(K2[m]) >= 4}
-R3 = {m: nfit.fit_local_sys(D3[m], T0, restrict_to=K3[m], z_min=ZMIN3)
+R3 = {m: nfit.fit_local_sys(D3[m], T0, fn=nfit.fit_local_adaptive,
+                            restrict_to=K3[m], z_min=ZMIN3)
       for m in sorted(D3) if len(K3[m]) >= 4}
 R2 = {k: v for k, v in R2.items() if v}
 R3 = {k: v for k, v in R3.items() if v}
 
-# ---------------------------------------------------------------- figure 1
+# THE COMBINED ERROR, matching constraints_final.py. 'tot' carries stat and the
+# window systematic only; the degree systematic is reported separately by
+# fit_local_sys and must go in alongside it, or every significance in these
+# panels is overstated. With the adaptive fit the omission is large: 3D mu_g=0
+# reads 35.8 sigma on tot alone against 18.3 with sys_deg included.
+for _R in (R2, R3):
+    for _v in _R.values():
+        _v['comb'] = float(np.hypot(_v['tot'], _v.get('sys_deg', 0.0)))
+
+# fig4_ncurve      n(mu_g), both dimensions
 fig, ax = plt.subplots(1, 2, figsize=(11, 4.2),
                        gridspec_kw=dict(width_ratios=[1.12, 1]))
 a = ax[0]
 for tag, R in (('2D', R2), ('3D', R3)):
     m = sorted(R)
-    a.errorbar(m, [R[x]['n'] for x in m], yerr=[R[x]['tot'] for x in m],
+    a.errorbar(m, [R[x]['n'] for x in m], yerr=[R[x]['comb'] for x in m],
                marker='o', ms=5, lw=1.6, capsize=3, color=C[tag], label=tag)
 a.axhline(0.25, ls=':', c=C['2D'], lw=1.2)
 a.axhline(1 / 6, ls=':', c=C['3D'], lw=1.2)
@@ -194,10 +214,10 @@ b.text(0.03, 0.97,
        transform=b.transAxes, fontsize=8, va='top')
 OUT['chi2_lo'] = lo_o; OUT['chi2_hi'] = hi_o
 OUT['chi2_lo_matched'] = lo_m; OUT['chi2_hi_matched'] = hi_m
-print(f'fig1b  chi2/dof  own {lo_o:.2f}/{hi_o:.2f}   matched {lo_m:.2f}/{hi_m:.2f}')
+print(f'fig4b  chi2/dof  own {lo_o:.2f}/{hi_o:.2f}   matched {lo_m:.2f}/{hi_m:.2f}')
 fig.tight_layout(); fig.savefig('fig4_ncurve.png', dpi=160)
 
-# ---------------------------------------------------------------- figure 2
+# fig3_frictionless  the exclusion, and finite-size convergence
 RXN = r'log\.N(?P<N>[0-9]+)_mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
 SZ = {}
 for p in glob.glob('sweep_size2d/log.N*_mu0.0_*'):
@@ -227,26 +247,26 @@ a.set_ylabel(r'$n(\mu_g=0)$')
 a.set_title('(a)  finite-size convergence, frictionless', fontsize=10, loc='left')
 a.axhline(0, c='k', lw=0.8, ls='--')
 OUT['size'] = [(int(v[0]), float(v[1]), float(v[2])) for v in vals]
-print('fig2  n(mu=0) vs N:', ' '.join(f'{n}:{y:.4f}' for n, y, _ in vals))
+print('fig3  n(mu=0) vs N:', ' '.join(f'{n}:{y:.4f}' for n, y, _ in vals))
 
 b = ax[1]
 for i, (tag, R, pred) in enumerate((('2D', R2, 0.25), ('3D', R3, 1 / 6))):
     r = R[0.0]
-    b.errorbar([i], [r['n']], yerr=[r['tot']], marker='o', ms=8, capsize=4,
+    b.errorbar([i], [r['n']], yerr=[r['comb']], marker='o', ms=8, capsize=4,
                color=C[tag])
     b.plot([i], [pred], marker='_', ms=26, mew=2.5, color='k')
     b.text(i + 0.12, pred, f'  1/(2D) = {pred:.3f}', va='center', fontsize=8)
-    b.text(i + 0.12, r['n'], f'  {r["n"]:.4f} ± {r["tot"]:.4f}\n'
-           f'  {abs(r["n"]-pred)/r["tot"]:.0f}σ below',
+    b.text(i + 0.12, r['n'], f'  {r["n"]:.4f} ± {r["comb"]:.4f}\n'
+           f'  {abs(r["n"]-pred)/r["comb"]:.0f}σ below',
            va='center', fontsize=8, color=C[tag])
-    OUT[f'excl_{tag}'] = (float(r['n']), float(r['tot']),
-                          float(abs(r['n'] - pred) / r['tot']))
+    OUT[f'excl_{tag}'] = (float(r['n']), float(r['comb']),
+                          float(abs(r['n'] - pred) / r['comb']))
 b.set_xlim(-0.4, 1.9); b.set_xticks([0, 1]); b.set_xticklabels(['2D', '3D'])
 b.set_ylabel(r'$n(\mu_g=0)$'); b.axhline(0, c='k', lw=0.8, ls='--')
 b.set_title('(b)  measured vs predicted', fontsize=10, loc='left')
 fig.tight_layout(); fig.savefig('fig3_frictionless.png', dpi=160)
 
-# ---------------------------------------------------------------- figure 3
+# fig2_curvature   mu(Theta) in log-log
 fig, ax = plt.subplots(1, 2, figsize=(10.5, 4.0))
 for a, D, K, tag, ZM in ((ax[0], D2, K2, '2D', ZMIN),
                          (ax[1], D3, K3, '3D', ZMIN3)):
@@ -262,7 +282,7 @@ for a, D, K, tag, ZM in ((ax[0], D2, K2, '2D', ZMIN),
     a.legend(frameon=False, fontsize=8)
 fig.tight_layout(); fig.savefig('fig2_curvature.png', dpi=160)
 
-# ---------------------------------------------------------------- figure 4
+# fig5_channels    the three-channel decomposition
 def load_csv(p):
     rows = []
     for x in csv.DictReader(open(p)):
@@ -345,7 +365,7 @@ ax[1].legend(frameon=False, fontsize=9, loc='upper right')
 fig.tight_layout(); fig.savefig('fig5_channels.png', dpi=160)
 OUT['channels2d'] = [[float(a) for a in row]
                      for row in zip(mus2, cc, cn, ct)]
-print('fig4  2D channel table regenerated (corrected frames)')
+print('fig5  2D channel table regenerated (corrected frames)')
 for m, a, b_, c_ in zip(mus2, cc, cn, ct):
     print(f'   mu_g={m:<6g} C_c={a:+.4f}  C_n={b_:+.4f}  C_t={c_:+.4f}  '
           f'sum={a+b_+c_:+.4f}')
@@ -381,7 +401,7 @@ for k in ('2D_0', '3D_0'):
 json.dump(OUT, open('figure_numbers.json', 'w'), indent=1)
 print('\nnumbers cached to figure_numbers.json')
 
-# ---------------------------------------------------------------- figure 5
+# fig6_chinull     channels against chi
 # WAS "the positive result: n_c and n_n collapse on chi". WITHDRAWN 2026-08-25.
 # The chi2/dof values that made that claim (1.1 and 0.8) were hand-transcribed
 # and are not reproducible under any frame policy, fabric
@@ -488,9 +508,9 @@ fig.suptitle('No microstructural variable organises n or its channels: '
              '0 passes in 64 (channel, candidate) pairs across both dimensions',
              fontsize=9, y=1.0)
 fig.tight_layout(); fig.savefig('fig6_chinull.png', dpi=160)
-print('fig5  points per panel:', {k: len(v) for k, v in pts.items()})
+print('fig6  points per panel:', {k: len(v) for k, v in pts.items()})
 
-# ---------------------------------------------------------------- figure 6
+# fig1_steady      strain convergence and the jamming limit
 fig, ax = plt.subplots(1, 3, figsize=(13, 3.8))
 def drift(pat):
     out = []
@@ -550,7 +570,7 @@ for N, y, e in OUT['size']:
 ax[2].set_xscale('log'); ax[2].set_xlabel('N'); ax[2].set_ylabel(r'$n(\mu_g=0)$')
 ax[2].set_title('(c)  finite-size convergence', fontsize=10, loc='left')
 fig.tight_layout(); fig.savefig('fig1_steady.png', dpi=160)
-print(f'fig6  drift old {old.mean():+.1%}  new {new.mean():+.1%}')
+print(f'fig1  drift old {old.mean():+.1%}  new {new.mean():+.1%}')
 # ---- the Theta regime, per cell, over the window actually fitted.
 # A range of "70-2000x the shear-generated m(gdot d)^2" and "8-46x the affine
 # shear velocity" holds only for the 2D FRICTIONAL cells. The frictionless baselines -- which carry constraints 1, 2 and 2b and

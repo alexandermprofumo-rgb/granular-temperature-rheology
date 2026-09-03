@@ -1,6 +1,6 @@
 """Reproduce constraint 10 -- 'n is independent of thermostat coupling'.
 
-No analysis script for sweep_pidamp exists in RESEARCH_LAMMPS.  Rebuilt from
+Built from
 run_openq.sh: t_damp in {0.125 ... 4.0} (32x), mu_g in {0.1, 0.3, 1.0}, eight
 Theta setpoints, three seeds, all at Pconf = 10 so Pi_damp = t_damp*sqrt(10).
 

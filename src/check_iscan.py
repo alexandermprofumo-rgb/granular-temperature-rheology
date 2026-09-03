@@ -1,7 +1,7 @@
 """Reproduce section 11 (n depends on I) from sweep_iscan.
 
-There is no script in RESEARCH_LAMMPS for this, so it is rebuilt here from the
-sweep layout in run_iscan.sh:  gdot in {3.162e-4, 1.0e-3, 3.162e-3}, with the
+Built from the sweep layout in
+run_iscan.sh:  gdot in {3.162e-4, 1.0e-3, 3.162e-3}, with the
 middle arm taken from sweep_matched2d (which run_iscan.sh says is 'already
 run').  I = gdot * d * sqrt(rho/P) = gdot * 1 * sqrt(1/10).
 """
