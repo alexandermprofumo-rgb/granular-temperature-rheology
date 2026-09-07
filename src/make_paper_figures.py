@@ -511,7 +511,8 @@ fig.tight_layout(); fig.savefig('fig6_chinull.png', dpi=160)
 print('fig6  points per panel:', {k: len(v) for k, v in pts.items()})
 
 # fig1_steady      strain convergence and the jamming limit
-fig, ax = plt.subplots(1, 3, figsize=(13, 3.8))
+fig, ax = plt.subplots(2, 2, figsize=(11, 7.2))
+ax = ax.flat
 def drift(pat):
     out = []
     for p in sorted(glob.glob(pat))[:400]:
@@ -565,10 +566,90 @@ ax[1].set_title('(b)  shaking unjams the pack', fontsize=10, loc='left')
 _l, _h = ax[1].get_ylim(); ax[1].set_ylim(_l - 0.22 * (_h - _l), _h)
 ax[1].legend(frameon=False, fontsize=8, loc='lower left')
 
-for N, y, e in OUT['size']:
-    ax[2].errorbar([N], [y], yerr=[e], marker='o', ms=6, capsize=3, color=C['2D'])
-ax[2].set_xscale('log'); ax[2].set_xlabel('N'); ax[2].set_ylabel(r'$n(\mu_g=0)$')
-ax[2].set_title('(c)  finite-size convergence', fontsize=10, loc='left')
+# Panel (c) held the finite-size series, which Fig. 3(a) already shows. It
+# carries mu(I) instead: a paper proposing a correction to mu(I) has to
+# establish that its simple shear reproduces mu(I) first. The athermal runs
+# are the ones to use, since there Theta is shear-generated as it is in the
+# literature rather than imposed.
+RXN = (r'log\.nt_g(?P<g>[0-9.eE+-]+)_e(?P<e>[0-9.]+)'
+       r'_mu(?P<mu>[0-9.]+)_s(?P<s>\d+)$')
+ath = {}
+for p in glob.glob('sweep_nothermo2/log.*'):
+    m = re.match(RXN, os.path.basename(p))
+    if not m or abs(float(m.group('e')) - 0.5) > 1e-9:
+        continue
+    q = nfit.parse_log(p)
+    if q and q['mu'] > 0 and q['I'] > 0:
+        ath.setdefault(float(m.group('mu')), []).append((q['I'], q['mu']))
+for mg, col in ((0.0, C['g']), (0.15, C['3D']), (0.3, C['2D'])):
+    if mg not in ath:
+        continue
+    by = {}
+    for I, mu in ath[mg]:
+        by.setdefault(round(np.log10(I), 1), []).append((I, mu))
+    pts = sorted((np.mean([v[0] for v in v2]), np.mean([v[1] for v in v2]))
+                 for v2 in by.values())
+    ax[2].plot([q[0] for q in pts], [q[1] for q in pts], 'o-', ms=5, lw=1.4,
+               color=col, label=rf'$\mu_g={mg:g}$')
+ax[2].axhline(0.11, ls=':', c='0.4', lw=1.2)
+ax[2].text(1.05e-4, 0.115, 'frictionless, Ref. [30]', fontsize=7, color='0.4')
+ax[2].set_xscale('log'); ax[2].set_xlabel(r'$I$')
+ax[2].set_ylabel(r'$\mu_{\rm eff}$ (no thermostat)')
+ax[2].set_title('(c)  the flow reproduces $\mu(I)$', fontsize=10, loc='left')
+ax[2].legend(frameon=False, fontsize=8, loc='center right')
+
+# The quasistatic plateau, for the comparison against published values in
+# Sec. III.A. mu at the coldest gated setpoint approximates the unforced limit.
+for tag, D, K, ZM in (('2D', D2, K2, ZMIN), ('3D', D3, K3, ZMIN3)):
+    vals = {}
+    for m in sorted(D):
+        if len(K[m]) < 4:
+            continue
+        _, byT = nfit.surviving_setpoints(D[m], z_min=ZM, restrict_to=K[m])
+        vals[m] = float(np.mean([x['mu'] for x in byT[min(K[m])]]))
+    print(f'fig1c {tag} plateau mu at coldest gated setpoint: '
+          + ', '.join(f'{m:g}:{v:.4f}' for m, v in vals.items() if m in
+                      (0.0, 0.3, 0.5, 1.0)))
+for mg in (0.15, 0.3):
+    if mg in ath:
+        mus = [q[1] for q in ath[mg]]
+        print(f'fig1c athermal mu_g={mg:g}: mu spans {min(mus):.4f}-{max(mus):.4f}'
+              f', flat to {100*(max(mus)-min(mus))/np.mean(mus):.1f}%')
+
+# Panel (d): the streaming field temp/deform subtracts is assumed affine. If it
+# is not, part of the mean flow is counted as temperature and every Theta in
+# the paper is shifted. The profiles are shipped in velprof/.
+RXP = r'prof\.mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
+for pth in sorted(glob.glob('velprof/prof.*')):
+    m = re.match(RXP, os.path.basename(pth))
+    if not m or m.group('s') != '1' or abs(float(m.group('T')) - 0.001) > 1e-9:
+        continue
+    rows, cur = [], []
+    for line in open(pth):
+        if line.startswith('#'):
+            continue
+        t = line.split()
+        if len(t) == 3:
+            if cur:
+                rows = cur
+            cur = []
+        elif len(t) >= 6:
+            cur.append([float(x) for x in t])
+    a = np.array(cur if cur else rows)
+    if not len(a):
+        continue
+    y, vx = a[:, 1], a[:, 3]
+    mg = float(m.group('mu'))
+    col = {0.0: C['g'], 0.15: C['3D'], 0.3: C['2D']}.get(mg, '0.5')
+    fit = np.polyval(np.polyfit(y, vx, 1), y)
+    sd = np.std(vx - fit) / (vx.max() - vx.min())
+    ax[3].plot(y, vx / vx.max(), 'o', ms=4, color=col,
+               label=rf'$\mu_g={mg:g}$, resid {sd:.1%}')
+    ax[3].plot(y, fit / vx.max(), '-', lw=1.0, color=col)
+ax[3].set_xlabel(r'$y$ (box fraction)')
+ax[3].set_ylabel(r'$v_x/v_x^{\rm max}$')
+ax[3].set_title('(d)  the streaming field is affine', fontsize=10, loc='left')
+ax[3].legend(frameon=False, fontsize=8, loc='upper left')
 fig.tight_layout(); fig.savefig('fig1_steady.png', dpi=160)
 print(f'fig1  drift old {old.mean():+.1%}  new {new.mean():+.1%}')
 # ---- the Theta regime, per cell, over the window actually fitted.

@@ -52,7 +52,11 @@ def last_block(path):
 
 
 def main():
-    paths = sorted(glob.glob('sweep_velprof/prof.*'))
+    # The profiles are small derived data and ship with the repository, so this
+    # runs from a clone. sweep_velprof/ is the raw campaign directory and is
+    # checked second for anyone who has re-run the campaign.
+    paths = (sorted(glob.glob('velprof/prof.*'))
+             or sorted(glob.glob('sweep_velprof/prof.*')))
     if not paths:
         print('sweep_velprof is empty -- run ./run_velprofile.sh first.')
         return
@@ -83,6 +87,8 @@ def main():
         th_sp = float(np.mean(res ** 2 + (vy - vy.mean()) ** 2) / 2)
         lab = os.path.basename(p).replace('prof.', '')
         q = nfit.parse_log(f'sweep_velprof/log.{lab}')
+        if q is None:
+            q = {}
         th = q['Theta'] if q else np.nan
         ratio = th_sp / th if th and np.isfinite(th) else np.nan
         if np.isfinite(ratio) and ratio >= 0.05:
