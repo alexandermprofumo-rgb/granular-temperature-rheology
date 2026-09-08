@@ -48,13 +48,20 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nfit
 
+# name, directory, filename pattern, z_min, x label, scale Theta_0 with the
+# lever, and the sign converting dn/dln(lever) into dn/dln(kappa).  kappa = E/P,
+# so the modulus lever carries +1, the pressure lever -1, and the tangential
+# lever does not move kappa at all.
 LEVERS = (
+    ('modulus', 'sweep_lev_E',
+     r'log\.E(?P<v>[0-9.eE+-]+)_mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$',
+     3.0, 'lnE', False, +1),
     ('pressure', 'sweep_lev_P',
      r'log\.P(?P<v>[0-9.]+)_mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$',
-     3.0, 'lnP', True),
+     3.0, 'lnP', True, -1),
     ('tangential', 'sweep_lev_kt',
      r'log\.k(?P<v>[0-9.eE+-]+)_mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$',
-     3.0, 'ln k_t', False),
+     3.0, 'ln k_t', False, 0),
 )
 CANON = 8.4664e-04
 # stiffness_matched.py, 2D, matched windows
@@ -104,7 +111,8 @@ def wslope(x, y, e):
 
 
 def main():
-    for name, d, rx, zmin, xlab, scale_t0 in LEVERS:
+    kappa = {}
+    for name, d, rx, zmin, xlab, scale_t0, ksign in LEVERS:
         C = cells(d, rx)
         if not C:
             print(f'{d} not unpacked; skipping {name}.\n')
@@ -153,13 +161,42 @@ def main():
             print('       matched: n = ' + '  '.join(f'{v:.3f}' for v in ys))
             print(f'                dn/d{xlab} = {s:+.4f} +/- {se:.4f}'
                   f'  ({abs(s)/se:.1f} sigma from zero)')
-            if name == 'pressure' and mg in DNDLNE:
-                p, pe = DNDLNE[mg]
-                gap = abs(s - (-p)) / float(np.hypot(se, pe))
-                print(f'                kappa predicts {-p:+.4f} +/- {pe:.4f}'
-                      f' from dn/dlnE; measured differs by {gap:.1f} sigma'
-                      f'  -> {"CONSISTENT" if gap < 2 else "REFUTED"}')
+            if ksign:
+                kappa.setdefault(mg, {})[name] = (ksign * s, se)
+                print(f'                dn/dln(kappa) = {ksign*s:+.4f}'
+                      f' +/- {se:.4f}')
             print()
+
+    print('=' * 90)
+    print('THE TWO KAPPA LEVERS COMBINED')
+    print('=' * 90)
+    print('  kappa = E/P, so the modulus and pressure levers move it in')
+    print('  opposite directions and are independent measurements of the same')
+    print('  derivative.  Where both exist they are checked against each other')
+    print('  before being pooled; a disagreement would mean n depends on E and')
+    print('  P separately and kappa is not the variable.\n')
+    print(f'  {"mu_g":>6}{"modulus":>20}{"pressure":>20}{"agree":>9}'
+          f'{"dn/dln(kappa)":>20}')
+    for mg in sorted(kappa):
+        got = kappa[mg]
+        cols = []
+        for nm in ('modulus', 'pressure'):
+            cols.append(f'{got[nm][0]:+.4f}+/-{got[nm][1]:.4f}'
+                        if nm in got else '-')
+        if len(got) == 2:
+            (a, ae), (b, be) = got['modulus'], got['pressure']
+            agree = abs(a - b) / float(np.hypot(ae, be))
+            w = np.array([1 / ae ** 2, 1 / be ** 2])
+            m = float(np.dot(w, [a, b]) / w.sum())
+            me = float(1 / np.sqrt(w.sum()))
+            ag = f'{agree:.1f}s'
+        else:
+            (m, me), = got.values()
+            ag = '-'
+        print(f'  {mg:>6g}{cols[0]:>20}{cols[1]:>20}{ag:>9}'
+              f'{f"{m:+.4f}+/-{me:.4f}":>20}')
+    print('\n  A sign change in the last column locates the peak of n(mu_g):')
+    print('  stiffening raises n below it and lowers n above it.')
     return 0
 
 
