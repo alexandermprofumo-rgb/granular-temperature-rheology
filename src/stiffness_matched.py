@@ -88,6 +88,7 @@ def wslope(x, y, e):
 
 
 def main():
+    bydim = {}
     for tag, d, zmin in SWEEPS:
         C = cells(d)
         if not C:
@@ -144,11 +145,34 @@ def main():
                     print(f'     {label:>9}: too few cells survive')
                     continue
                 s, se = wslope(np.array(xs), np.array(ys), np.array(es))
+                if label == 'matched':
+                    bydim.setdefault(mg, {})[tag] = (s, se)
                 vals = '  '.join(f'{v:.3f}' for v in ys)
                 print(f'     {label:>9}: n = {vals}')
                 print(f'     {"":>9}  dn/dlnE = {s:+.4f} +/- {se:.4f}'
                       f'  ({abs(s)/se:.1f} sigma)')
             print()
+
+    both = {m: v for m, v in bydim.items() if len(v) == 2}
+    print('=' * 84)
+    print('IS THE STIFFNESS DEPENDENCE ITSELF DIMENSION-INDEPENDENT?')
+    print('=' * 84)
+    print('  The friction law agrees between dimensions at kappa = 1e4.  If')
+    print('  dn/dlnE differed between dimensions, that agreement would hold at')
+    print('  one stiffness by coincidence rather than as a property of n.  The')
+    print('  frictions below are the ones where both dimensions have a lever.\n')
+    if not both:
+        print('  no friction has both dimensions; comparison not possible.')
+        return 0
+    print(f'  {"mu_g":>6}{"2D":>21}{"3D":>21}{"difference":>21}{"":>8}')
+    for mg in sorted(both):
+        (a, ae), (b, be) = both[mg]['2D'], both[mg]['3D']
+        d, de = b - a, float(np.hypot(ae, be))
+        print(f'  {mg:>6g}{f"{a:+.4f}+/-{ae:.4f}":>21}'
+              f'{f"{b:+.4f}+/-{be:.4f}":>21}'
+              f'{f"{d:+.4f}+/-{de:.4f}":>21}{f"{abs(d)/de:.1f}s":>8}')
+    print('\n  The 3D lever has three modulus values against five in 2D, so')
+    print('  these are the weaker of the two measurements in every row.')
     return 0
 
 
