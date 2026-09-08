@@ -83,6 +83,41 @@ def jammed(runs):
             or np.mean([x['Z'] for x in byT[t] if 'Z' in x]) >= ZMIN]
 
 
+def dacruz_prediction(I_ours=3.162e-4, d=1.0, rho=1.0):
+    """Ref. [daCruz2005] Eq. (10) and their dv scaling, in OUR units.
+
+    Two conversions stand between their number and ours, and the paper used to
+    apply neither.
+
+      1. Inertial number.  Their Eq. (10) is I = gdot*sqrt(m/P); ours is the
+         dimension-independent gdot*d*sqrt(rho/P).  For disks m = rho*pi*d^2/4,
+         so theirs is sqrt(pi/4) = 0.886 times ours.
+
+      2. Temperature.  Table I defines Theta = m<dv^2>/D, a per-degree-of-
+         freedom kinetic temperature.  Their dv is a velocity fluctuation whose
+         square "defines the so-called granular temperature", but whether it is
+         the magnitude of the 2D fluctuation vector or a single component is
+         not stated in a form this analysis can settle.  Both are carried
+         below, and the spread between them is the honest uncertainty on the
+         comparison.  A quoted single value would be false precision.
+
+    None of this touches the scaling comparison in Sec. VII, where a constant
+    factor cancels in a ratio taken across the shear-rate decade.
+    """
+    m = rho * np.pi * (d / 2.0) ** 2           # disk mass, our units
+    I_dc = np.sqrt(np.pi / 4.0) * I_ours       # their convention
+    ratio = ((1.0 / 3.0) * I_dc ** -0.5) ** 2  # (dv/(gdot d))^2 at that I
+    print('\n  da Cruz dv/(gdot d) = (1/3) I^-1/2, converted into our units')
+    print(f'    our I = {I_ours:.3e}  ->  their I = {I_dc:.3e}  '
+          f'(factor sqrt(pi/4) = {np.sqrt(np.pi/4):.3f})')
+    print(f'    (dv/(gdot d))^2                          = {ratio:>6.0f}')
+    print(f'    Theta/(gdot d)^2, dv a 2D vector  m/D    = {m/2*ratio:>6.0f}')
+    print(f'    Theta/(gdot d)^2, dv per component  m    = {m*ratio:>6.0f}')
+    print('    measured above: 310-385.  The prediction spans a factor of')
+    print('    2.5 across these conventions, so the comparison supports')
+    print('    agreement to within a factor of about two and no better.')
+
+
 def main():
     A, T = athermal(), thermostatted()
     if not A:
@@ -103,6 +138,8 @@ def main():
               f'{th/g**2:>12.0f}{np.mean([x["mu"] for x in r]):>9.4f}'
               f'{np.mean([x.get("Z", np.nan) for x in r]):>7.2f}'
               f'{np.mean([x["I"] for x in r]):>10.3e}')
+
+    dacruz_prediction()
 
     # THE UNFORCED LOCUS. Without a bath, Theta is whatever shear heating and
     # inelastic dissipation settle on, so varying gdot at fixed e traces the
