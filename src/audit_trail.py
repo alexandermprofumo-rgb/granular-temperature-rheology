@@ -75,8 +75,13 @@ def fit(runs, keep, zmin):
                               restrict_to=keep, z_min=zmin)
 
 
+KK_P = {'2D': 1.0 / 8.0, '3D': 1.0 / 6.0}   # Kim & Kamrin's fitted exponents
+
+
 def main():
     zs = []
+    domin = {}
+    frictionless = {}
     for tag, d, zmin in SWEEPS:
         C = cells(d)
         if not C:
@@ -105,6 +110,9 @@ def main():
             print(f'  {m:>6g}{len(runs):>6}{len(allT):>8}{len(keep):>7}'
                   f'{str(deg):>5}{f"[{w[0]:.2e}, {w[1]:.2e}]":>26}'
                   f'{r["n"]:>9.4f}{stat:>9.4f}{sysd:>9.4f}{tot:>9.4f}')
+            domin.setdefault(tag, []).append((m, stat, sysd))
+            if m == 0.0:
+                frictionless[tag] = (r['n'], tot)
 
             # per-packing refit: the block the error model never resamples
             seeds = sorted({x['seed'] for x in runs})
@@ -123,6 +131,29 @@ def main():
                     for j in range(i + 1, len(v)):
                         if tot > 0:
                             zs.append((v[i] - v[j]) / (np.sqrt(2) * tot))
+
+    print('\n' + '=' * 100)
+    print('WHICH ERROR COMPONENT DOMINATES, AND WHERE')
+    print('=' * 100)
+    print('  The paper quotes the two combined, so a reader cannot otherwise')
+    print('  see that the dimensions are limited by different things.\n')
+    for tag, rows in domin.items():
+        nstat = sum(1 for _, st, sy in rows if st > sy)
+        worst = max(rows, key=lambda r: (r[2] / r[1]) if r[1] > 0 else 0)
+        print(f'  {tag}: statistical dominates in {nstat} of {len(rows)} cells, '
+              f'systematic in {len(rows) - nstat}.')
+        print(f'      largest systematic-to-statistical ratio '
+              f'{worst[2]/worst[1]:.1f} at mu_g = {worst[0]:g} '
+              f'({worst[2]:.4f} against {worst[1]:.4f}).')
+
+    print('\n' + '=' * 100)
+    print('THE FRICTIONLESS VALUES AGAINST THE PUBLISHED EXPONENTS')
+    print('=' * 100)
+    for tag, (n0, e0) in frictionless.items():
+        print(f'  {tag}: n(mu_g=0) = {n0:.4f} +/- {e0:.4f}, below the fitted '
+              f'p = {KK_P[tag]:.4f} by a factor {KK_P[tag]/n0:.1f}')
+    print('  These are the factors quoted in the abstract and conclusion; they')
+    print('  are ratios to the FITTED exponents, not to the geometric estimate.')
 
     print('\n' + '=' * 100)
     print('IS THE QUOTED ERROR CONSISTENT WITH THE SPREAD BETWEEN PACKINGS?')
