@@ -5,7 +5,7 @@ time, and the numbers used are printed alongside each panel so they can be
 quoted in text without re-deriving them.
 
 Figures, in the order written:
-  fig1_steady       strain convergence, and Z against Theta at the jamming limit
+  fig2_drift, fig3_velprof, fig4_rheology, fig5_jamming   the Sec. II checks
   fig2_curvature    mu(Theta) in log-log -- why n is not an exponent
   fig3_frictionless the exclusion, and its finite-size convergence
   fig4_ncurve       n(mu_g), both dimensions, with the divergence above mu_g~0.2
@@ -518,9 +518,15 @@ fig.suptitle('No microstructural variable organizes $n$ or its channels:\n'
 fig.tight_layout(rect=(0, 0, 1, 0.87)); fig.savefig('fig6_chinull.png', dpi=400)
 print('fig6  points per panel:', {k: len(v) for k, v in pts.items()})
 
-# fig1_steady      strain convergence and the jamming limit
-fig, ax = plt.subplots(2, 2, figsize=(7.1, 4.8))
-ax = ax.flat
+# Four single-column figures, one per subsection of Sec. II.  They were one
+# four-panel figure until a reviewer pointed out that its panels were discussed
+# in four different subsections.  Drawn at single-column width, 3.4 in, which is
+# the width they print at.
+_figs = {}
+for _k, _name in ((0, 'fig2_drift'), (1, 'fig5_jamming'),
+                  (2, 'fig4_rheology'), (3, 'fig3_velprof')):
+    _figs[_k] = (plt.subplots(figsize=(3.4, 2.7)), _name)
+ax = {_k: _v[0][1] for _k, _v in _figs.items()}
 def drift(pat):
     out = []
     for p in sorted(glob.glob(pat))[:400]:
@@ -554,7 +560,6 @@ ax[0].hist(100 * old, bins=30, alpha=.7, color=C['n'], label=r'strain $0.12$')
 ax[0].hist(100 * new, bins=30, alpha=.7, color=C['c'], label=r'strain $1.0$')
 ax[0].axvline(0, c='k', lw=.8)
 ax[0].set_xlabel(r'in-window drift in $\mu$  (%)'); ax[0].set_ylabel('runs')
-ax[0].set_title('(a)  steady state reached', fontsize=9, loc='left')
 ax[0].legend(frameon=False, fontsize=8)
 OUT['drift_old'] = float(old.mean()); OUT['drift_new'] = float(new.mean())
 
@@ -570,7 +575,6 @@ for tag, D, iso, col in (('2D', D2, 4.0, C['2D']), ('3D', D3, 6.0, C['3D'])):
     ax[1].axhline(iso, ls=':', color=col, lw=1.2)
 ax[1].set_xscale('log'); ax[1].set_xlabel(r'$\Theta$')
 ax[1].set_ylabel('Z (contacts per grain)')
-ax[1].set_title('(b)  shaking unjams the pack', fontsize=9, loc='left')
 _l, _h = ax[1].get_ylim(); ax[1].set_ylim(_l - 0.22 * (_h - _l), _h)
 ax[1].legend(frameon=False, fontsize=8, loc='lower left')
 
@@ -603,7 +607,6 @@ ax[2].axhline(0.11, ls=':', c='0.4', lw=1.2)
 ax[2].text(1.05e-4, 0.115, 'frictionless, Ref. [30]', fontsize=7, color='0.4')
 ax[2].set_xscale('log'); ax[2].set_xlabel(r'$I$')
 ax[2].set_ylabel(r'$\mu_{\rm eff}$ (no thermostat)')
-ax[2].set_title('(c)  the flow reproduces $\mu(I)$', fontsize=9, loc='left')
 ax[2].legend(frameon=False, fontsize=8, loc='center right')
 
 # The quasistatic plateau, for the comparison against published values in
@@ -663,9 +666,11 @@ for pth in _vp:
     ax[3].plot(y, fit / vx.max(), '-', lw=1.0, color=col)
 ax[3].set_xlabel(r'$y$ (box fraction)')
 ax[3].set_ylabel(r'$v_x/v_x^{\rm max}$')
-ax[3].set_title('(d)  the streaming field is affine', fontsize=9, loc='left')
 ax[3].legend(frameon=False, fontsize=8, loc='upper left')
-fig.tight_layout(); fig.savefig('fig1_steady.png', dpi=400)
+for (_fig, _), _name in _figs.values():
+    _fig.tight_layout()
+    _fig.savefig(f'{_name}.png', dpi=400)
+print('wrote', ', '.join(n for _, n in _figs.values()))
 print(f'fig1  drift old {old.mean():+.1%}  new {new.mean():+.1%}')
 # ---- the Theta regime, per cell, over the window actually fitted.
 # A range of "70-2000x the shear-generated m(gdot d)^2" and "8-46x the affine
