@@ -50,6 +50,8 @@ PRODUCTION = [
     ('sweep_velprof',   'velocity profile check'),
     ('sweep_iscan_stiff',      'shear rates at ten times the modulus, 2D'),
     ('sweep_iscan_stiff_E1e4', 'shear rates at one tenth the modulus, 2D'),
+    ('sweep_iscan_stiff_E1e7', 'shear rates at a hundred times the modulus, 2D'),
+    ('sweep_lev_td',    'bath damping scan'),
 ]
 
 # log.lammps is LAMMPS' own scratch file, one per working directory, not a run.

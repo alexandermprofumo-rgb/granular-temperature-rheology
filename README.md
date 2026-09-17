@@ -8,7 +8,7 @@ The question is whether the two variables combine separably,
 
     mu_eff * Theta^n = F(I),
 
-and if so what the exponent `n` is. From 2454 discrete-element runs: they do
+and if so what the exponent `n` is. From 3112 discrete-element runs: they do
 not. Separability holds for frictionless grains and fails at every grain
 friction tested, and the local slope `n` is roughly an order of magnitude below
 the value a fabric-counting argument gives.
@@ -94,7 +94,7 @@ PY=/path/to/python ./src/run_sweep.sh
 Drivers take the interpreter from `$PY`, falling back to a project-local
 `.venv` and then to `python3`. Campaigns are long: comparing at equal strain
 makes step count scale as `1/gamma_dot`, so the slowest shear-rate arm costs ten
-times the fastest, and the full set is 2454 runs.
+times the fastest, and the full set is 3112 runs.
 The production set is listed run by run by `make_manifest.py`, which writes
 `src/derived/manifest.csv` once the log archive is unpacked. The archive also
 holds exploratory and superseded campaigns that no figure uses.

@@ -25,6 +25,14 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+# Figures are drawn at the width they are printed at, 7.1 in across two
+# columns, so nothing is scaled down in LaTeX and a 9 pt label stays 9 pt on
+# the page against 10 pt body text.  Before this they were drawn 10.5-13 in
+# wide and shrank by 35-45%.
+plt.rcParams.update({'font.size': 9, 'axes.labelsize': 9, 'axes.titlesize': 9,
+                     'xtick.labelsize': 8, 'ytick.labelsize': 8,
+                     'legend.fontsize': 8, 'figure.dpi': 400})
+
 import nfit
 
 ZMIN = 3.0
@@ -110,7 +118,7 @@ for _R in (R2, R3):
         _v['comb'] = float(np.hypot(_v['tot'], _v.get('sys_deg', 0.0)))
 
 # fig4_ncurve      n(mu_g), both dimensions
-fig, ax = plt.subplots(1, 2, figsize=(11, 4.2),
+fig, ax = plt.subplots(1, 2, figsize=(7.1, 2.8),
                        gridspec_kw=dict(width_ratios=[1.12, 1]))
 a = ax[0]
 for tag, R in (('2D', R2), ('3D', R3)):
@@ -128,7 +136,7 @@ a.text(1.12, 0.170, 'Eq. (2), 3D', color=C['3D'], fontsize=8,
 a.set_xscale('symlog', linthresh=0.05)
 a.set_xlim(-0.004, 2.6)
 a.set_xlabel(r'grain friction  $\mu_g$'); a.set_ylabel(r'$n(\Theta_0)$')
-a.set_title('(a)  the exponent against grain friction', fontsize=10, loc='left')
+a.set_title('(a)  the exponent against grain friction', fontsize=9, loc='left')
 a.legend(frameon=False, fontsize=9); a.set_ylim(-0.03, 0.33)
 
 # Panel (b) shows BOTH window treatments.  Comparing local slopes fitted over
@@ -193,8 +201,8 @@ b.errorbar(mm, dm, yerr=em, marker='o', ms=5, lw=1.4, capsize=3,
 b.set_xscale('symlog', linthresh=0.05)
 b.set_xlim(-0.004, 1.6)
 b.set_xlabel(r'$\mu_g$'); b.set_ylabel(r'$n_{3D}-n_{2D}$')
-b.set_title('(b)  dimension difference, two window treatments',
-            fontsize=10, loc='left')
+b.set_title('(b)  difference between dimensions',
+            fontsize=9, loc='left')
 b.legend(frameon=False, fontsize=8, loc='lower right')
 
 def _c2(dd, ee, sel):
@@ -215,7 +223,7 @@ b.text(0.03, 0.97,
 OUT['chi2_lo'] = lo_o; OUT['chi2_hi'] = hi_o
 OUT['chi2_lo_matched'] = lo_m; OUT['chi2_hi_matched'] = hi_m
 print(f'fig4b  chi2/dof  own {lo_o:.2f}/{hi_o:.2f}   matched {lo_m:.2f}/{hi_m:.2f}')
-fig.tight_layout(); fig.savefig('fig4_ncurve.png', dpi=160)
+fig.tight_layout(); fig.savefig('fig4_ncurve.png', dpi=400)
 
 # fig3_frictionless  the exclusion, and finite-size convergence
 RXN = r'log\.N(?P<N>[0-9]+)_mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
@@ -227,7 +235,7 @@ for p in glob.glob('sweep_size2d/log.N*_mu0.0_*'):
         q['Tgran'] = float(m.group('T'))
         SZ.setdefault(int(m.group('N')), []).append(q)
 SZ[NG] = D2[0.0]
-fig, ax = plt.subplots(1, 2, figsize=(10.5, 4.0))
+fig, ax = plt.subplots(1, 2, figsize=(7.1, 2.75))
 a = ax[0]
 Ns = sorted(SZ)
 pool = [SZ[N] for N in Ns]
@@ -244,7 +252,7 @@ a.errorbar([v[0] for v in vals], [v[1] for v in vals],
            color=C['2D'])
 a.set_xscale('log'); a.set_xlabel('N (grains)')
 a.set_ylabel(r'$n(\mu_g=0)$')
-a.set_title('(a)  finite-size convergence, frictionless', fontsize=10, loc='left')
+a.set_title('(a)  finite-size convergence, frictionless', fontsize=9, loc='left')
 a.axhline(0, c='k', lw=0.8, ls='--')
 OUT['size'] = [(int(v[0]), float(v[1]), float(v[2])) for v in vals]
 print('fig3  n(mu=0) vs N:', ' '.join(f'{n}:{y:.4f}' for n, y, _ in vals))
@@ -263,11 +271,11 @@ for i, (tag, R, pred) in enumerate((('2D', R2, 0.25), ('3D', R3, 1 / 6))):
                           float(abs(r['n'] - pred) / r['comb']))
 b.set_xlim(-0.4, 1.9); b.set_xticks([0, 1]); b.set_xticklabels(['2D', '3D'])
 b.set_ylabel(r'$n(\mu_g=0)$'); b.axhline(0, c='k', lw=0.8, ls='--')
-b.set_title('(b)  measured vs predicted', fontsize=10, loc='left')
-fig.tight_layout(); fig.savefig('fig3_frictionless.png', dpi=160)
+b.set_title('(b)  measured vs predicted', fontsize=9, loc='left')
+fig.tight_layout(); fig.savefig('fig3_frictionless.png', dpi=400)
 
 # fig2_curvature   mu(Theta) in log-log
-fig, ax = plt.subplots(1, 2, figsize=(10.5, 4.0))
+fig, ax = plt.subplots(1, 2, figsize=(7.1, 2.75))
 for a, D, K, tag, ZM in ((ax[0], D2, K2, '2D', ZMIN),
                          (ax[1], D3, K3, '3D', ZMIN3)):
     for m in [x for x in (0.0, 0.1, 0.3, 1.0) if x in D]:
@@ -278,9 +286,9 @@ for a, D, K, tag, ZM in ((ax[0], D2, K2, '2D', ZMIN),
     a.set_xscale('log'); a.set_yscale('log')
     a.set_xlabel(r'$\Theta$'); a.set_ylabel(r'$\mu/\mu(\Theta_{min})$')
     a.set_title(f'({"ab"[tag=="3D"]})  {tag}: $\\mu(\\Theta)$ is curved',
-                fontsize=10, loc='left')
+                fontsize=9, loc='left')
     a.legend(frameon=False, fontsize=8)
-fig.tight_layout(); fig.savefig('fig2_curvature.png', dpi=160)
+fig.tight_layout(); fig.savefig('fig2_curvature.png', dpi=400)
 
 # fig5_channels    the three-channel decomposition
 def load_csv(p):
@@ -300,7 +308,7 @@ def loc(x, y, x0, deg=2):
 
 
 ch2 = load_csv('chan_steady2d.csv')
-fig, ax = plt.subplots(1, 2, figsize=(11, 4.2))
+fig, ax = plt.subplots(1, 2, figsize=(7.1, 2.8))
 mus2, cc, cn, ct, ntot = [], [], [], [], []
 for m in sorted(set(r['mu_g'] for r in ch2)):
     if m not in K2 or len(K2[m]) < 4:
@@ -345,7 +353,7 @@ ax[0].set_ylim(min(lo * 1.35, -0.02), None)
 ax[0].set_xscale('symlog', linthresh=0.05)
 ax[0].set_xlim(-0.004, 1.6)
 ax[0].set_xlabel(r'$\mu_g$'); ax[0].set_ylabel('channel contribution')
-ax[0].set_title('(a)  2D, $a_t$ measured', fontsize=10, loc='left')
+ax[0].set_title('(a)  2D, $a_t$ measured', fontsize=9, loc='left')
 _lo0, _hi0 = ax[0].get_ylim()
 ax[0].set_ylim(_lo0, _hi0 + 0.30 * (_hi0 - _lo0))   # headroom for the legend
 ax[0].legend(frameon=False, fontsize=8, loc='upper left')
@@ -358,11 +366,11 @@ ax[1].axhline(0, c='k', lw=0.8)
 ax[1].set_xscale('symlog', linthresh=0.05)
 ax[1].set_xlim(-0.004, 1.6)
 ax[1].set_xlabel(r'$\mu_g$'); ax[1].set_ylabel('share of $n$')
-ax[1].set_title('(b)  the dominant channel inverts', fontsize=10, loc='left')
+ax[1].set_title('(b)  the dominant channel inverts', fontsize=9, loc='left')
 _lo1, _hi1 = ax[1].get_ylim()
 ax[1].set_ylim(_lo1, _hi1 + 0.22 * (_hi1 - _lo1))
 ax[1].legend(frameon=False, fontsize=9, loc='upper right')
-fig.tight_layout(); fig.savefig('fig5_channels.png', dpi=160)
+fig.tight_layout(); fig.savefig('fig5_channels.png', dpi=400)
 OUT['channels2d'] = [[float(a) for a in row]
                      for row in zip(mus2, cc, cn, ct)]
 print('fig5  2D channel table regenerated (corrected frames)')
@@ -462,7 +470,7 @@ for lever, fname in FILES.items():
         pts['n_n'].append((chi, -loc(x, np.log(an), x0)[1], lever))
         pts['n_tot'].append((chi, -loc(x, np.log([r['mu'] for r in sel]), x0)[1], lever))
 
-fig, ax = plt.subplots(1, 3, figsize=(13, 4.0), sharex=True)
+fig, ax = plt.subplots(1, 3, figsize=(7.1, 3.1), sharex=True)
 for a, key, lab in zip(ax, ('n_c', 'n_n', 'n_tot'),
                        (r'$n_c=-d\ln a_c/d\ln\Theta$',
                         r'$n_n=-d\ln a_n/d\ln\Theta$',
@@ -471,7 +479,7 @@ for a, key, lab in zip(ax, ('n_c', 'n_n', 'n_tot'),
     for lever in sorted(set(p[2] for p in P)):
         q = [p for p in P if p[2] == lever]
         a.plot([p[0] for p in q], [p[1] for p in q], MK[lever], ms=6,
-               alpha=.8, label=lever + ' lever')
+               alpha=.8, label=lever + ' scan')
     if P:
         xx = np.log([p[0] for p in P]); yy = np.array([p[1] for p in P])
         A = np.vstack([np.ones_like(xx), xx, xx ** 2]).T
@@ -488,30 +496,30 @@ for a, key, lab in zip(ax, ('n_c', 'n_n', 'n_tot'),
             _tw = _json.load(open('channel_state_2d.json'))['pairs']
             if f'{key}|chi' in _tw:
                 _c2, _tz, _ok = _tw[f'{key}|chi']
-                lbl += (f'\npre-registered test: $\\chi^2$/dof = {_c2:.1f}, '
+                lbl += (f'\npre-registered test:\n$\\chi^2$/dof = {_c2:.1f}, '
                         f'trend {_tz:.1f}$\\sigma$\n{"PASSES" if _ok else "FAILS"}')
         except (OSError, ValueError, KeyError):
             pass
         # headroom first, then place the block in the cleared strip: the
         # curves peak mid-panel and the annotation used to sit on top of them
         _l, _h = a.get_ylim()
-        a.set_ylim(_l, _h + 0.34 * (_h - _l))
-        a.text(.04, .97, lbl, transform=a.transAxes, fontsize=8, va='top')
-    a.set_xscale('log'); a.set_xlabel(r'$\chi$  (Coulomb-mobilised fraction)')
-    a.set_title(lab, fontsize=10, loc='left')
+        a.set_ylim(_l, _h + 0.55 * (_h - _l))
+        a.text(.04, .97, lbl, transform=a.transAxes, fontsize=6.5, va='top')
+    a.set_xscale('log'); a.set_xlabel(r'$\chi$  (Coulomb-mobilized fraction)')
+    a.set_title(lab, fontsize=8, loc='left')
 ax[0].set_ylabel('channel log-slope')
 # one shared legend under the title: per-axes it collided with the annotation
 _h, _l = ax[0].get_legend_handles_labels()
 fig.legend(_h, _l, frameon=False, fontsize=8, ncol=3,
-           loc='upper center', bbox_to_anchor=(0.5, 0.945))
-fig.suptitle('No microstructural variable organises n or its channels: '
-             '0 passes in 64 (channel, candidate) pairs across both dimensions',
-             fontsize=9, y=1.0)
-fig.tight_layout(); fig.savefig('fig6_chinull.png', dpi=160)
+           loc='upper center', bbox_to_anchor=(0.5, 0.93))
+fig.suptitle('No microstructural variable organizes $n$ or its channels:\n'
+             '0 passes in 64 (channel, candidate) pairs, both dimensions',
+             fontsize=8)
+fig.tight_layout(rect=(0, 0, 1, 0.87)); fig.savefig('fig6_chinull.png', dpi=400)
 print('fig6  points per panel:', {k: len(v) for k, v in pts.items()})
 
 # fig1_steady      strain convergence and the jamming limit
-fig, ax = plt.subplots(2, 2, figsize=(11, 7.2))
+fig, ax = plt.subplots(2, 2, figsize=(7.1, 4.8))
 ax = ax.flat
 def drift(pat):
     out = []
@@ -546,7 +554,7 @@ ax[0].hist(100 * old, bins=30, alpha=.7, color=C['n'], label=r'strain $0.12$')
 ax[0].hist(100 * new, bins=30, alpha=.7, color=C['c'], label=r'strain $1.0$')
 ax[0].axvline(0, c='k', lw=.8)
 ax[0].set_xlabel(r'in-window drift in $\mu$  (%)'); ax[0].set_ylabel('runs')
-ax[0].set_title('(a)  steady state reached', fontsize=10, loc='left')
+ax[0].set_title('(a)  steady state reached', fontsize=9, loc='left')
 ax[0].legend(frameon=False, fontsize=8)
 OUT['drift_old'] = float(old.mean()); OUT['drift_new'] = float(new.mean())
 
@@ -562,7 +570,7 @@ for tag, D, iso, col in (('2D', D2, 4.0, C['2D']), ('3D', D3, 6.0, C['3D'])):
     ax[1].axhline(iso, ls=':', color=col, lw=1.2)
 ax[1].set_xscale('log'); ax[1].set_xlabel(r'$\Theta$')
 ax[1].set_ylabel('Z (contacts per grain)')
-ax[1].set_title('(b)  shaking unjams the pack', fontsize=10, loc='left')
+ax[1].set_title('(b)  shaking unjams the pack', fontsize=9, loc='left')
 _l, _h = ax[1].get_ylim(); ax[1].set_ylim(_l - 0.22 * (_h - _l), _h)
 ax[1].legend(frameon=False, fontsize=8, loc='lower left')
 
@@ -595,7 +603,7 @@ ax[2].axhline(0.11, ls=':', c='0.4', lw=1.2)
 ax[2].text(1.05e-4, 0.115, 'frictionless, Ref. [30]', fontsize=7, color='0.4')
 ax[2].set_xscale('log'); ax[2].set_xlabel(r'$I$')
 ax[2].set_ylabel(r'$\mu_{\rm eff}$ (no thermostat)')
-ax[2].set_title('(c)  the flow reproduces $\mu(I)$', fontsize=10, loc='left')
+ax[2].set_title('(c)  the flow reproduces $\mu(I)$', fontsize=9, loc='left')
 ax[2].legend(frameon=False, fontsize=8, loc='center right')
 
 # The quasistatic plateau, for the comparison against published values in
@@ -620,7 +628,14 @@ for mg in (0.15, 0.3):
 # is not, part of the mean flow is counted as temperature and every Theta in
 # the paper is shifted. The profiles are shipped in velprof/.
 RXP = r'prof\.mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
-for pth in sorted(glob.glob('velprof/prof.*')):
+# the profiles ship with the code, so look beside the script as well as in the
+# run directory; panel (d) silently vanished once when only the latter was tried
+_vp = sorted(glob.glob('velprof/prof.*')) or sorted(glob.glob(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'velprof',
+                 'prof.*')))
+if not _vp:
+    raise SystemExit('fig1: no velocity profiles found, panel (d) would be empty')
+for pth in _vp:
     m = re.match(RXP, os.path.basename(pth))
     if not m or m.group('s') != '1' or abs(float(m.group('T')) - 0.001) > 1e-9:
         continue
@@ -648,9 +663,9 @@ for pth in sorted(glob.glob('velprof/prof.*')):
     ax[3].plot(y, fit / vx.max(), '-', lw=1.0, color=col)
 ax[3].set_xlabel(r'$y$ (box fraction)')
 ax[3].set_ylabel(r'$v_x/v_x^{\rm max}$')
-ax[3].set_title('(d)  the streaming field is affine', fontsize=10, loc='left')
+ax[3].set_title('(d)  the streaming field is affine', fontsize=9, loc='left')
 ax[3].legend(frameon=False, fontsize=8, loc='upper left')
-fig.tight_layout(); fig.savefig('fig1_steady.png', dpi=160)
+fig.tight_layout(); fig.savefig('fig1_steady.png', dpi=400)
 print(f'fig1  drift old {old.mean():+.1%}  new {new.mean():+.1%}')
 # ---- the Theta regime, per cell, over the window actually fitted.
 # A range of "70-2000x the shear-generated m(gdot d)^2" and "8-46x the affine

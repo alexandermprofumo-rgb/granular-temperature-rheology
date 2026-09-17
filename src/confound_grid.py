@@ -24,7 +24,10 @@ The offset between stiffnesses is reported as well, but it discriminates weakly:
 A predicts -0.4*ln(10) times the arm slope and B predicts ln(10) times the
 modulus-lever slope, and those two numbers are close.
 
-Usage:  python3 confound_grid.py
+The frictionless control runs the same test at mu_g = 0, where only the two
+families that scanned it are available.
+
+Usage:  python3 confound_grid.py [mu_g]
 """
 import glob
 import os
@@ -36,7 +39,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nfit
 
-MU = 0.3
+MU = float(sys.argv[1]) if len(sys.argv) > 1 else 0.3
 ZMIN = 3.0
 CANON = 8.4664e-04
 GAMMAS = (3.162e-4, 1.0e-3, 3.162e-3)
@@ -46,13 +49,16 @@ DNDLNE_MOD = (0.0360, 0.0049)          # stiffness_matched.py, 2D, matched
 RX_G = r'log\.g(?P<g>[0-9.eE+-]+)_mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
 RX_M = r'log\.mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
 
-# label, modulus, and where the three arms live.  The E = 1e5 middle arm is the
+# label, modulus, and where the three arms live.  E = 1e7 (kappa = 1e6) was
+# added last, to test whether the drift of the arm slope continues toward the
+# stiffness of real grains or saturates there.  The E = 1e5 middle arm is the
 # production scan itself, on different packings from every other cell here.
 FAMILIES = (
     ('1e4', 1.0e4, [('sweep_iscan_stiff_E1e4', RX_G, None)]),
     ('1e5', 1.0e5, [('sweep_iscan2', RX_G, None),
                     ('sweep_steady2d', RX_M, 1.0e-3)]),
     ('1e6', 1.0e6, [('sweep_iscan_stiff', RX_G, None)]),
+    ('1e7', 1.0e7, [('sweep_iscan_stiff_E1e7', RX_G, None)]),
 )
 
 
@@ -70,6 +76,23 @@ def load(sources):
             g = gfix if gfix is not None else float(m.group('g'))
             out.setdefault(g, []).append(q)
     return out
+
+
+def overlap_theta0(grid, common):
+    """Geometric centre of the Theta range every cell covers.
+
+    The setpoint grid is matched by label, not by temperature, and a stiffer
+    cell runs colder at the same label: at kappa = 1e6 the slow arm tops out at
+    Theta = 8.0e-4, below the canonical Thetaz = 8.47e-4, so reading n there
+    would extrapolate past the data.  Reading every cell at the centre of the
+    range they share keeps the comparison interpolated.
+    """
+    lo, hi = [], []
+    for runs in grid.values():
+        _, byT = nfit.surviving_setpoints(runs, z_min=ZMIN)
+        th = [np.mean([x['Theta'] for x in byT[t]]) for t in common]
+        lo.append(min(th)); hi.append(max(th))
+    return float(np.sqrt(max(lo) * min(hi)))
 
 
 def gated(runs):
@@ -98,24 +121,35 @@ def main():
     missing = [(t, g) for t, _, _ in FAMILIES for g in GAMMAS
                if (t, g) not in grid]
     if missing:
-        print('incomplete grid, missing:', missing)
-        return 1
+        print(f'  mu_g = {MU}: no data for {sorted(set(t for t, _ in missing))},'
+              ' those families are dropped')
+        for t, g in missing:
+            grid.pop((t, g), None)
+        if len(grid) < 6:
+            print('  too few cells left.')
+            return 1
 
     keep = {k: gated(v) for k, v in grid.items()}
     common = sorted(set.intersection(*(set(v) for v in keep.values())))
     print('=' * 88)
-    print(f'THE CONFOUND GRID   2D, mu_g = {MU},  three stiffnesses')
+    print(f'THE CONFOUND GRID   2D, mu_g = {MU},  '
+          f'{len(grid)//len(GAMMAS)} stiffnesses')
     print('=' * 88)
     print(f'  setpoints surviving the gate in all {len(grid)} cells: {len(common)}')
     if len(common) < 4:
         print('  too few for a matched fit.')
         return 1
+    theta0 = overlap_theta0(grid, common)
+    print(f'  Theta window shared by every cell centres on {theta0:.4e}')
+    print(f'  (canonical Thetaz = {CANON:.4e}; n is read at the shared centre)')
 
     n = {}
     print(f'\n  {"E":>6}{"kappa":>10}{"gdot":>11}{"n":>10}{"+/-":>9}')
     for tag, E, _ in FAMILIES:
         for g in GAMMAS:
-            r = nfit.fit_local_sys(grid[(tag, g)], CANON,
+            if (tag, g) not in grid:
+                continue
+            r = nfit.fit_local_sys(grid[(tag, g)], theta0,
                                    fn=nfit.fit_local_adaptive,
                                    restrict_to=common, z_min=ZMIN)
             if not r:
@@ -177,6 +211,8 @@ def main():
         offs = [(n[(hi, g)][0] - n[(lo, g)][0],
                  float(np.hypot(n[(lo, g)][1], n[(hi, g)][1])))
                 for g in GAMMAS if (lo, g) in n and (hi, g) in n]
+        if not offs:
+            continue
         w = np.array([1 / e ** 2 for _, e in offs])
         o = float(np.dot(w, [v for v, _ in offs]) / w.sum())
         oe = float(1 / np.sqrt(w.sum()))
