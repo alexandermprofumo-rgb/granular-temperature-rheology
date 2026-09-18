@@ -42,7 +42,10 @@ import nfit
 MU = float(sys.argv[1]) if len(sys.argv) > 1 else 0.3
 ZMIN = 3.0
 CANON = 8.4664e-04
-GAMMAS = (3.162e-4, 1.0e-3, 3.162e-3)
+# The fourth, slower rate exists only at the two softest moduli: it costs ten
+# times the steps of the baseline, and what it buys is curvature within a
+# series, which is measurable where the series are cheapest.
+GAMMAS = (1.0e-4, 3.162e-4, 1.0e-3, 3.162e-3)
 P_CONF = 10.0
 DNDLNE_MOD = (0.0360, 0.0049)          # stiffness_matched.py, 2D, matched
 
@@ -118,22 +121,21 @@ def main():
         for g in GAMMAS:
             if g in C:
                 grid[(tag, g)] = C[g]
-    missing = [(t, g) for t, _, _ in FAMILIES for g in GAMMAS
-               if (t, g) not in grid]
-    if missing:
-        print(f'  mu_g = {MU}: no data for {sorted(set(t for t, _ in missing))},'
-              ' those families are dropped')
-        for t, g in missing:
-            grid.pop((t, g), None)
-        if len(grid) < 6:
-            print('  too few cells left.')
-            return 1
+    have = {t: [g for g in GAMMAS if (t, g) in grid] for t, _, _ in FAMILIES}
+    for t, gs in have.items():
+        if len(gs) < 3:
+            print(f'  mu_g = {MU}: {t} has only {len(gs)} shear rates, dropped')
+            for g in gs:
+                grid.pop((t, g), None)
+    if len(grid) < 6:
+        print('  too few cells left.')
+        return 1
 
     keep = {k: gated(v) for k, v in grid.items()}
     common = sorted(set.intersection(*(set(v) for v in keep.values())))
     print('=' * 88)
     print(f'THE CONFOUND GRID   2D, mu_g = {MU},  '
-          f'{len(grid)//len(GAMMAS)} stiffnesses')
+          f'{len(set(t for t, _ in grid))} stiffnesses, {len(grid)} cases')
     print('=' * 88)
     print(f'  setpoints surviving the gate in all {len(grid)} cells: {len(common)}')
     if len(common) < 4:
