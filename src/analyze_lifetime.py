@@ -132,7 +132,38 @@ def main():
         print(f'\n    alpha from the {lab}: {v.mean():.3f} +/- '
               f'{v.std(ddof=1)/np.sqrt(v.size):.3f} over {v.size} matched pairs, '
               f'spread {v.std(ddof=1):.3f}')
-    print(f'    Hertzian impact at fixed speed: 2/5 = 0.400')
+    print('\n  BETA, FROM HOW THE MEAN DURATION MOVES WITH TEMPERATURE')
+    print('  t_c ~ Theta^(-beta).  A grain carried out of contact by its own')
+    print('  agitation would take a time d/sqrt(Theta), so beta = 1/2 there.')
+    import nfit as _nfit
+    import glob as _glob
+    th = {}
+    for p in _glob.glob(f'{D}/log.*'):
+        m = re.match(RX.replace('dump\\.track', 'log'), os.path.basename(p))
+        if not m:
+            continue
+        q = _nfit.parse_log(p)
+        if q:
+            k = (float(m.group('E')), float(m.group('g')), float(m.group('T')))
+            th.setdefault(k, []).append(q['Theta'])
+    be = []
+    for E in sorted({k[0] for k in tc}):
+        for g in sorted({k[1] for k in tc if k[0] == E}):
+            Ts = sorted({k[2] for k in tc if k[0] == E and k[1] == g})
+            if len(Ts) < 3 or any((E, g, T) not in th for T in Ts):
+                continue
+            x = np.log([np.mean(th[(E, g, T)]) for T in Ts])
+            y = np.log([tc[(E, g, T)][0] for T in Ts])
+            b = -np.polyfit(x, y, 1)[0]
+            be.append(b)
+            print(f'    E = {E:.0e}, gdot = {g:.3e}   beta = {b:+.3f}'
+                  f'   over Theta = {np.exp(x[0]):.2e} to {np.exp(x[-1]):.2e}')
+    if be:
+        be = np.array(be)
+        print(f'\n    beta = {be.mean():.3f} +/- '
+              f'{be.std(ddof=1)/np.sqrt(be.size):.3f}, spread {be.std(ddof=1):.3f}'
+              f', over {be.size} series')
+    print(f'\n    Hertzian impact at fixed speed: 2/5 = 0.400')
     print(f'    contact already loaded to P:    1/3 = 0.333')
     print(f'    what the surface fit of confound_joint.py wants: 0.63')
     return 0

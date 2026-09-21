@@ -46,14 +46,15 @@ Three tiers, because the raw output is far too large to distribute.
 The `*.csv` files in `src/`. These hold per-cell fitted values and are what
 most of the analysis scripts consume.
 
-**2. LAMMPS logs — Zenodo, 93 MB compressed.**
+**2. LAMMPS logs — Zenodo, 93 MB compressed,
+[doi:10.5281/zenodo.22879491](https://doi.org/10.5281/zenodo.22879491).**
 9408 per-run `log.*` files holding the time series, across 45 directories.
 **The figure scripts need these**, not just the CSVs. Download the archive and
 unpack it inside `src/`:
 
 ```bash
 cd src
-tar -xf /path/to/lammps-logs.tar.xz     # restores sweep_*/log.* alongside the code
+tar -xf /path/to/lammps-logs-v1.1.0.tar.xz   # restores sweep_*/log.* beside the code
 python make_paper_figures.py
 ```
 
@@ -76,7 +77,7 @@ Python 3.11+ with `numpy`, `scipy`, `matplotlib`.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cd src
-tar -xf lammps-logs.tar.xz              # tier 2, from Zenodo
+tar -xf lammps-logs-v1.1.0.tar.xz       # tier 2, from Zenodo
 python make_paper_figures.py
 ```
 
