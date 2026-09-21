@@ -37,6 +37,8 @@ SETS = [
     ('sweep_iscan_stiff',      'shear rates at ten times the modulus, 2D'),
     ('sweep_iscan_stiff_E1e4', 'shear rates at one tenth the modulus, 2D'),
     ('sweep_iscan_stiff_E1e7', 'shear rates at a hundred times the modulus, 2D'),
+    ('sweep_iscan3d_stiff', 'shear rates at ten times the modulus, 3D'),
+    ('sweep_tracker',    'contact lifetimes'),
     ('sweep_nothermo2', 'athermal control'),
     ('sweep_velprof',   'velocity-profile check'),
 ]
@@ -89,6 +91,24 @@ def main():
         print(f'{"":48}  fixed: ' + ('; '.join(fixed) if fixed else 'none'))
         print(f'{"":48}  targets: {temps}, packings: {seeds}')
     print(f'{"":42}{total:>6}  log files in {len(SETS)} sets')
+
+    # The three counts the paper quotes: finished production runs, the sets
+    # they occupy, and what the deposited archive holds.  make_manifest.py
+    # lists the runs one by one; this counts them.
+    done = 0
+    for d, _ in SETS:
+        for p in glob.glob(os.path.join(d, 'log.*')):
+            if os.path.basename(p) == 'log.lammps':
+                continue
+            with open(p, errors='ignore') as fh:
+                if any(l.startswith('DONE') for l in fh):
+                    done += 1
+    arch = [p for p in glob.glob('sweep_*/log.*')
+            if os.path.basename(p) != 'log.lammps']
+    dirs = {p.split(os.sep)[0] for p in arch}
+    print(f'\n  finished production runs: {done} in {len(SETS)} sets')
+    print(f'  archive as deposited:     {len(arch)} files in {len(dirs)} '
+          f'directories')
     return 0
 
 

@@ -121,13 +121,15 @@ documented departures from the plan rather than the original design.
 
 Anthropic's Claude (Opus 5) was used in preparing the code in this repository.
 It wrote and modified Python analysis and figure code, specifically the fitting
-module, the four validity gates, and the scripts that produce the paper's
+module, the four data cutoffs, and the scripts that produce the paper's
 figures. It proposed the frozen-degree jackknife and the two-stage jamming
-gate, which the author adopted after review and which are recorded as
-Amendments 6 and 7 in `ANALYSIS_PROTOCOL.md`. It identified errors in earlier
-drafts of the analysis, including two results that were subsequently withdrawn,
-and it wrote several of the scripts that make previously undocumented claims
-reproducible.
+cutoff, which the author adopted after review and which are recorded as
+Amendments 6 and 7 in `ANALYSIS_PROTOCOL.md`. It designed the stiffness grid
+that separates the inertial number from the contact time, wrote the LAMMPS
+decks and drivers for it and for the contact-lifetime runs, and wrote the
+analysis of both. It identified errors in earlier drafts of the analysis,
+including two results that were subsequently withdrawn, and it wrote several of
+the scripts that make previously undocumented claims reproducible.
 
 No LLM is listed as an author or co-author of this work.
 
@@ -148,6 +150,15 @@ acknowledgments. That statement covers the text; this one covers the code.
 | `src/analyze_nothermo.py` | the unforced-locus block |
 | `src/make_manifest.py` | the whole file |
 | `src/run_seed3_2d.sh` | the third-seed campaign driver |
+| `src/confound_grid.py` | the whole file |
+| `src/confound_joint.py` | the whole file |
+| `src/confound_3d.py` | the whole file |
+| `src/confound_test.py` | the whole file |
+| `src/analyze_lifetime.py` | the whole file |
+| `src/scan_summary.py` | the whole file |
+| `src/make_fig_schematic.py` | the whole file |
+| `src/audit_trail.py` | the whole file |
+| `src/stiffness_matched.py`, `src/damping_matched.py`, `src/levers_matched.py`, `src/frictionlaw_matched.py`, `src/kk_master.py` | the whole file, each |
 | `paper/lint.py` | the whole file |
 
 Smaller edits, meaning interpreter selection, script-relative paths, output
