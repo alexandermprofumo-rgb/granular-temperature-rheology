@@ -1,5 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite the paper below."
+type: software
 title: "Granular temperature and the inertial number in dense granular flow"
 abstract: >-
   Simulation and analysis code for a discrete-element study of the dependence
@@ -7,15 +8,37 @@ abstract: >-
 authors:
   - family-names: Profumo
     given-names: Alexander
+    email: alexandermprofumo@gmail.com
+    city: Santa Cruz
+    region: California
+    country: US
 license: MIT
 repository-code: "https://github.com/alexandermprofumo-rgb/granular-temperature-rheology"
+keywords:
+  - granular matter
+  - granular rheology
+  - discrete element method
+  - LAMMPS
+  - granular temperature
+  - inertial number
+references:
+  - type: data
+    title: >-
+      Per-run LAMMPS logs for discrete-element simulations of granular
+      temperature in dense granular flow
+    authors:
+      - family-names: Profumo
+        given-names: Alexander
+    doi: "10.5281/zenodo.22879491"
+    version: "1.1.0"
+    year: 2026
 preferred-citation:
   type: article
   title: >-
-    Grain friction breaks the separability of granular temperature and
-    inertial number in dense granular flow
+    Grain properties set the granular-temperature response of dense granular
+    flow
   authors:
     - family-names: Profumo
       given-names: Alexander
   year: 2026
-  # journal / volume / doi: fill in on acceptance
+  # journal, volume, pages and doi: fill in on acceptance
