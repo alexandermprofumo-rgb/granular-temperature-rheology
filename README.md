@@ -8,7 +8,7 @@ The question is whether the two variables combine separably,
 
     mu_eff * Theta^n = F(I),
 
-and if so what the exponent `n` is. From 3112 discrete-element runs: they do
+and if so what the exponent `n` is. From 3282 discrete-element runs: they do
 not. Separability holds for frictionless grains and fails at every grain
 friction tested, and the local slope `n` is roughly an order of magnitude below
 the value a fabric-counting argument gives.
@@ -46,11 +46,10 @@ Three tiers, because the raw output is far too large to distribute.
 The `*.csv` files in `src/`. These hold per-cell fitted values and are what
 most of the analysis scripts consume.
 
-**2. LAMMPS logs — Zenodo, 71 MB compressed.**
-8994 per-run `log.*` files holding the time series, across 42 campaign
-directories, plus LAMMPS' own `log.lammps` scratch file in each. **The figure
-scripts need these**, not just the CSVs. Download the archive and unpack it
-inside `src/`:
+**2. LAMMPS logs — Zenodo, 93 MB compressed.**
+9408 per-run `log.*` files holding the time series, across 45 directories.
+**The figure scripts need these**, not just the CSVs. Download the archive and
+unpack it inside `src/`:
 
 ```bash
 cd src
@@ -94,10 +93,16 @@ PY=/path/to/python ./src/run_sweep.sh
 Drivers take the interpreter from `$PY`, falling back to a project-local
 `.venv` and then to `python3`. Campaigns are long: comparing at equal strain
 makes step count scale as `1/gamma_dot`, so the slowest shear-rate arm costs ten
-times the fastest, and the full set is 3112 runs.
+times the fastest, and the full set is 3282 runs.
 The production set is listed run by run by `make_manifest.py`, which writes
 `src/derived/manifest.csv` once the log archive is unpacked. The archive also
-holds exploratory and superseded campaigns that no figure uses.
+holds exploratory and superseded runs that no figure uses.
+
+Contact lifetimes are the one measurement the archive cannot reproduce. They
+come from per-contact records rather than from the logs, and those records are
+5.5 GB, so `src/derived/contact_lifetime.csv` carries the per-run summary the
+paper quotes: record count, mean and median contact duration, and the duration
+in units of the shear time.
 
 ## The pre-registration
 
