@@ -157,6 +157,7 @@ acknowledgments. That statement covers the text; this one covers the code.
 | `src/analyze_lifetime.py` | the whole file |
 | `src/scan_summary.py` | the whole file |
 | `src/make_fig_schematic.py` | the whole file |
+| `src/make_letter_figures.py` | the whole file |
 | `src/audit_trail.py` | the whole file |
 | `src/stiffness_matched.py`, `src/damping_matched.py`, `src/levers_matched.py`, `src/frictionlaw_matched.py`, `src/kk_master.py` | the whole file, each |
 | `paper/lint.py` | the whole file |
