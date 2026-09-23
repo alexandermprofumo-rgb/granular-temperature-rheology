@@ -176,8 +176,10 @@ def majority_rule_audit(sweeps=None, z=None):
                   ('sweep_restit', 3.0), ('sweep_iscan2', 3.0),
                   ('sweep_lev_E3d', 4.0), ('sweep_iscan3d', 4.0)]
     removed = admitted = total = 0
+    per_sweep = {}
     for name, zmin in sweeps:
         zz = z if z is not None else zmin
+        n_here = rm_here = 0
         for runs in _any_cells(name).values():
             # nfit's other three gates first: the survey is over runs that
             # would otherwise be used, not over everything on disk.
@@ -187,16 +189,25 @@ def majority_rule_audit(sweeps=None, z=None):
                 if not rs:
                     continue
                 total += len(rs)
+                n_here += len(rs)
                 jam = [r for r in rs if r['Z'] >= zz]
                 if len(jam) * 2 > len(rs):
                     removed += len(rs) - len(jam)      # majority holds: prune
+                    rm_here += len(rs) - len(jam)
                 elif jam and any(abs(r['Z'] - zz) <= MARGIN for r in jam):
                     admitted += 1                       # marginal minority
+        per_sweep[name] = (n_here, rm_here)
     print()
     print('=' * 78)
     print('MAJORITY RULE: what run-filtering alone would do')
     print('=' * 78)
     print(f'  surveyed {total} runs across {len(sweeps)} gated sweeps')
+    # The manuscript quotes the removals against the runs of the ONE scan they
+    # occur in, not against the whole survey, so that denominator has to be
+    # printed here or it is a number with no source.
+    print(f'  {"sweep":<20}{"runs surveyed":>15}{"sub-isostatic":>15}')
+    for name, (n_here, rm_here) in per_sweep.items():
+        print(f'  {name:<20}{n_here:>15}{rm_here:>15}')
     print(f'  sub-isostatic runs removed where the setpoint keeps a majority: {removed}')
     print(f'  setpoints run-filtering would wrongly admit on a minority:      {admitted}')
     print('  With the majority rule all of the second group are rejected and')

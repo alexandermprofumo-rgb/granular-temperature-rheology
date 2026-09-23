@@ -176,10 +176,12 @@ for tag, R in (('2D', R2), ('3D', R3)):
     b.axhline(PUBLISHED[tag], ls=':', lw=1.0, color=C[tag])
     OUT[f'slope_{tag}'] = (c[1], s[1])
     print(f'  branch slope {tag}: {c[1]:+.3f} +/- {s[1]:.3f}')
-b.text(0.0015, PUBLISHED['2D'] + 0.006, 'published, disks', fontsize=6.5,
-       color=C['2D'])
-b.text(0.0015, PUBLISHED['3D'] + 0.006, 'published, spheres', fontsize=6.5,
-       color=C['3D'])
+# name the value rather than its status: "published" left the reader to guess
+# which published number, and whose
+b.text(0.0015, PUBLISHED['2D'] + 0.006, r'$p=1/8$ fitted for disks',
+       fontsize=6.5, color=C['2D'])
+b.text(0.0015, PUBLISHED['3D'] + 0.006, r'$p=1/6$ fitted for spheres',
+       fontsize=6.5, color=C['3D'])
 b.set_xscale('symlog', linthresh=0.05)
 b.set_xlim(-0.004, 1.6); b.set_ylim(0, 0.34)
 b.set_xticks([0, 0.05, 0.1, 0.2, 0.5, 1.0])

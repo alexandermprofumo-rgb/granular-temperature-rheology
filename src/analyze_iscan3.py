@@ -122,6 +122,14 @@ def main():
         print(f'  mu_g = {mg}    Theta_0 = {Tuse:.3e}'
               f'{"  (canonical)" if use_canon else "  (window centre)"}'
               f'   shared window [{lo:.2e}, {hi:.2e}]')
+        # Sec. IV G quotes the window in units of the shear scale, per arm,
+        # to show that the three arms sit at different Theta/(gdot d)^2 even
+        # though they share a window in absolute Theta.  gdot = I*sqrt(P) with
+        # P = 10, d = 1.
+        spans = '   '.join(
+            f'{tag} {lo/(I*np.sqrt(10.0))**2:.0f}-{hi/(I*np.sqrt(10.0))**2:.0f}'
+            for tag, I, _ in pools)
+        print(f'     Theta/(gdot d)^2 over that window:  {spans}')
         for tag, I, runs in pools:
             ts, byT = gated(runs, window=(lo, hi))
             f = nfit.fit_local_sys(runs, Tuse, restrict_to=ts, z_min=ZMIN)
@@ -255,6 +263,77 @@ def main():
               f' {out[True][0]:>10.2f} {out[True][1]:>10.1e}')
     print('  Separability requires BOTH beta = 0 and gamma = 0. "RMS penalty" is')
     print('  the factor by which the separable ansatz inflates the residual.')
+
+    # ------------------------------------------------- T0 under two variants
+    # The window used above is computed BEFORE the jamming cutoff, so the cutoff
+    # then removes different targets from different arms and the ranges actually
+    # fitted differ at their ends.  Sec. V B of the paper reports the same test
+    # twice more, once with every arm cut to the intersection of what survives
+    # and once with a cubic replacing the quadratic, and quotes the least
+    # favourable of the three as the bound.  Those six numbers had no source
+    # until this block; only the first column was ever printed.
+    def _joint_p(rec, q):
+        """p for the hypothesis that every L*u^j interaction vanishes."""
+        u = np.array([r[2] for r in rec])
+        y = np.array([r[3] for r in rec])
+        L = np.array([np.log(r[1] / 3.162e-4) for r in rec])
+        one = np.ones_like(u)
+        base = [one, L] + [u ** j for j in range(1, q + 1)]
+        Ar = np.column_stack(base)
+        Af = np.column_stack(base + [L * u ** j for j in range(1, q + 1)])
+        n, pf = len(y), Af.shape[1]
+        if n - pf < 2:
+            return float('nan')
+        F = ((_rss(Ar, y) - _rss(Af, y)) / q) / (_rss(Af, y) / (n - pf))
+        return float(1 - stats.f.cdf(F, q, n - pf))
+
+    def _points(c, intersected):
+        """One record per run, over the shared window or over its intersection.
+
+        c['win'] is computed BEFORE the jamming cutoff, so the arms end up
+        fitted over ranges that differ at the ends.  The intersected variant
+        recomputes the window from what actually survives the cutoff in each
+        arm, which is narrower and is the conservative reading.
+        """
+        win = c['win']
+        if intersected:
+            los, his = [], []
+            for _, _, runs in c['pools']:
+                ts, byT = gated(runs, window=c['win'])
+                th = [r['Theta'] for t in ts for r in byT[t] if r['Theta'] > 0]
+                if not th:
+                    return []
+                los.append(min(th)); his.append(max(th))
+            win = (max(los), min(his))
+            if win[1] <= win[0]:
+                return []
+        rec = []
+        for tag, I, runs in c['pools']:
+            ts, byT = gated(runs, window=c['win'])
+            for t in ts:
+                for r in byT[t]:
+                    if r['Theta'] <= 0 or r['mu'] <= 0:
+                        continue
+                    # the as-reported column gates on the target mean, exactly
+                    # as the T0 table does; only the intersected variant tests
+                    # each run against the recomputed window
+                    if intersected and not (win[0] * 0.999 <= r['Theta']
+                                            <= win[1] * 1.001):
+                        continue
+                    rec.append((tag, I, np.log(r['Theta'] / c['T0']),
+                                np.log(r['mu'])))
+        return rec
+
+    print('=' * 78)
+    print('T0v  THE SAME TEST UNDER TWO VARIANTS   (Sec. V B)')
+    print('=' * 78)
+    print(f'  {"mu_g":>6} {"as reported":>14} {"intersected":>14}'
+          f' {"intersected+cubic":>20} {"points":>18}')
+    for c in cells:
+        w, x = _points(c, False), _points(c, True)
+        print(f'  {c["mg"]:>6} {_joint_p(w, 2):>14.1e} {_joint_p(x, 2):>14.1e}'
+              f' {_joint_p(x, 3):>20.1e} {f"{len(w)} / {len(x)}":>18}')
+    print('  The bound the paper claims is the least favourable of the three.')
 
     # ------------------------------------------------------------ T1 pooled
     # Restricting every arm to the shared window is correct but expensive: it

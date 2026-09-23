@@ -158,6 +158,8 @@ acknowledgments. That statement covers the text; this one covers the code.
 | `src/scan_summary.py` | the whole file |
 | `src/make_fig_schematic.py` | the whole file |
 | `src/make_letter_figures.py` | the whole file |
+| `src/athermal_table.py` | the whole file |
+| `src/analyze_iscan3.py` | the three-arm separability test, the window-matching gate, the model-free sub-window slopes, the joint test under intersected windows and a cubic |
 | `src/audit_trail.py` | the whole file |
 | `src/stiffness_matched.py`, `src/damping_matched.py`, `src/levers_matched.py`, `src/frictionlaw_matched.py`, `src/kk_master.py` | the whole file, each |
 | `paper/lint.py` | the whole file |

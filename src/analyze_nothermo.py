@@ -178,7 +178,8 @@ def main():
     print('  OVERLAY: the thermostatted curve (sweep_restit, same e, mu_g, gdot,')
     print('  packing) evaluated at the athermal Theta_shear.')
     print(f'  {"e":>5}{"mu_g":>6}{"Th_shear":>12}{"thermostatted Theta":>22}'
-          f'{"extrapolation":>15}{"mu athermal":>13}{"mu predicted":>14}{"sigma":>8}')
+          f'{"extrapolation":>15}{"mu athermal":>13}{"mu predicted":>14}{"sigma":>8}'
+          f'{"Delta":>10}')
     zs = []
     for k in sorted(A):
         kind, g, e, mg = k
@@ -221,8 +222,13 @@ def main():
         se = float(np.hypot(epred, sd_a if np.isfinite(sd_a) else 0.0))
         z = d / se if se > 0 else np.nan
         zs.append(z)
+        # The manuscript's table quotes the athermal-minus-thermostatted shift
+        # as a percentage.  Printing it here keeps that column traceable rather
+        # than leaving it as arithmetic done by hand on the two mu values.
+        pct = 100.0 * (mu_a / np.exp(pred) - 1.0)
         print(f'  {e:>5g}{mg:>6g}{th_a:>12.3e}   [{th_t.min():.2e},{th_t.max():.2e}]'
-              f'{ex:>15}{mu_a:>13.4f}{np.exp(pred):>14.4f}{z:>8.1f}')
+              f'{ex:>15}{mu_a:>13.4f}{np.exp(pred):>14.4f}{z:>8.1f}'
+              f'{pct:>+9.1f}%')
     if zs:
         zs = np.array([z for z in zs if np.isfinite(z)])
         print(f'\n  RMS discrepancy {np.sqrt((zs**2).mean()):.1f} sigma over {len(zs)}'

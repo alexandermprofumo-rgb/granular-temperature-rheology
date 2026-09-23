@@ -191,6 +191,11 @@ def main():
     print('=' * 78)
     print(f'   ratio {ratio.mean():.4f} +/- {ratio.std():.4f} over {len(ratio)} runs'
           f'   (min {ratio.min():.3f}, max {ratio.max():.3f})')
+    # This ratio is not the closure of the identity, which analyze_exact_split
+    # checks at machine precision.  It carries the error of the K-bin angular
+    # average as well, which is why it sits near 0.985 rather than at 1.
+    worst = float(np.abs(ratio - 1.0).max())
+    print(f'   worst |sum/2 - mu|/mu = {worst:.2e}   (binning, not closure)')
 
     cells = {}
     for r in rows:
