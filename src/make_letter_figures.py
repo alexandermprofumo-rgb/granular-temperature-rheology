@@ -54,7 +54,7 @@ OUT = {}
 # it is that a reader can see what one run is.  Both comparison Letters open
 # with a picture of the system and this one did not.
 PACKING = 'sweep_matched2d/data.m2d_seed1'
-WX, WY = 42.0, 12.0             # the window drawn, in grain diameters
+WX, WY = 62.0, 11.0             # the window drawn, in grain diameters
 INK, GRAIN, EDGE, HOT = '#2b2b2b', '#c9d6e4', '#5b7fa6', '#c0504d'
 
 
@@ -86,23 +86,23 @@ def panel_setup(ax):
               angles='xy', scale_units='xy', scale=0.5, width=0.005, zorder=4)
     ax.plot([0, WX, WX, 0, 0], [0, 0, WY, WY, 0], color=INK, lw=0.9, zorder=3)
     for s, yy in ((+1, WY), (-1, 0.0)):          # Lees-Edwards shear
-        ax.annotate('', xy=(WX / 2 + s * 7.0, yy + s * 1.5),
-                    xytext=(WX / 2 - s * 7.0, yy + s * 1.5),
+        ax.annotate('', xy=(WX / 2 + s * 9.0, yy + s * 1.4),
+                    xytext=(WX / 2 - s * 9.0, yy + s * 1.4),
                     arrowprops=dict(arrowstyle='-|>', color=INK, lw=1.2))
-    for xx in (-2.2, WX + 2.2):                  # barostat, along the gradient
+    for xx in (-1.8, WX + 1.8):                  # barostat, along the gradient
         for s in (1, -1):
-            ax.annotate('', xy=(xx, WY / 2 + s * 1.0),
-                        xytext=(xx, WY / 2 + s * 7.5),
+            ax.annotate('', xy=(xx, WY / 2 + s * 0.9),
+                        xytext=(xx, WY / 2 + s * 6.5),
                         arrowprops=dict(arrowstyle='-|>', color='#4a7d52',
                                         lw=1.2, mutation_scale=8))
-    ax.text(WX / 2, WY + 2.6, r'shear rate $\dot\gamma$', ha='center',
+    ax.text(WX / 2, WY + 2.4, r'shear rate $\dot\gamma$', ha='center',
             va='bottom', color=INK, fontsize=7)
-    ax.text(WX + 4.4, WY / 2, r'pressure $P$', ha='center', va='center',
+    ax.text(WX + 3.6, WY / 2, r'pressure $P$', ha='center', va='center',
             color='#4a7d52', fontsize=7, rotation=270)
-    ax.text(0.0, -2.4, r'random forces from the bath, set by $\Theta$',
+    ax.text(0.0, -2.2, r'random forces from the bath, set by $\Theta$',
             ha='left', va='top', color=HOT, fontsize=7)
-    ax.set_xlim(-7.0, WX + 7.0)
-    ax.set_ylim(-4.2, WY + 3.6)
+    ax.set_xlim(-5.5, WX + 5.5)
+    ax.set_ylim(-4.0, WY + 3.4)
     ax.set_aspect('equal')
     ax.axis('off')
     ax.set_title('(a)  one run', loc='left')
@@ -191,8 +191,10 @@ R2 = {k: v for k, v in R2.items() if v}
 R3 = {k: v for k, v in R3.items() if v}
 
 # ---------------------------------------------------------------- figure 1
+# panel (a) is drawn at equal aspect, so its allocated height has to be large
+# enough for the packing to span the column rather than being centred in it
 fig, ax = plt.subplots(3, 1, figsize=(W, 5.15),
-                       gridspec_kw=dict(height_ratios=[0.62, 1.5, 1.65]))
+                       gridspec_kw=dict(height_ratios=[0.78, 1.5, 1.65]))
 panel_setup(ax[0])
 
 a = ax[1]
