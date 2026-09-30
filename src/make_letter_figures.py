@@ -29,6 +29,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nfit
@@ -48,6 +49,63 @@ PUBLISHED = {'2D': 0.125, '3D': 1 / 6}    # Kim and Kamrin, disks and spheres
 C = {'2D': '#C44E52', '3D': '#4C72B0', 'mod': '#4C72B0', 'prs': '#55A868'}
 RXM = r'log\.mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
 OUT = {}
+
+# Panel 1(a) draws a real packing rather than a cartoon, because the point of
+# it is that a reader can see what one run is.  Both comparison Letters open
+# with a picture of the system and this one did not.
+PACKING = 'sweep_matched2d/data.m2d_seed1'
+WX, WY = 42.0, 12.0             # the window drawn, in grain diameters
+INK, GRAIN, EDGE, HOT = '#2b2b2b', '#c9d6e4', '#5b7fa6', '#c0504d'
+
+
+def read_packing(path):
+    xs, ys, rs = [], [], []
+    with open(path) as f:
+        rows = f.read().split('Atoms # sphere')[1].strip().split('\n')
+    for r in rows:
+        t = r.split()
+        if len(t) < 7:
+            continue
+        rs.append(float(t[2]) / 2.0)
+        xs.append(float(t[4]))
+        ys.append(float(t[5]))
+    return np.array(xs), np.array(ys), np.array(rs)
+
+
+def panel_setup(ax):
+    x, y, r = read_packing(PACKING)
+    m = (x - r > 0) & (x + r < WX) & (y - r > 0) & (y + r < WY)
+    x, y, r = x[m], y[m], r[m]
+    rng = np.random.default_rng(7)
+    kicked = rng.choice(len(x), size=max(6, len(x) // 8), replace=False)
+    for i in range(len(x)):
+        ax.add_patch(Circle((x[i], y[i]), r[i], facecolor=GRAIN,
+                            edgecolor=EDGE, lw=0.35, zorder=2))
+    a = rng.uniform(0, 2 * np.pi, size=len(kicked))
+    ax.quiver(x[kicked], y[kicked], np.cos(a), np.sin(a), color=HOT,
+              angles='xy', scale_units='xy', scale=0.5, width=0.005, zorder=4)
+    ax.plot([0, WX, WX, 0, 0], [0, 0, WY, WY, 0], color=INK, lw=0.9, zorder=3)
+    for s, yy in ((+1, WY), (-1, 0.0)):          # Lees-Edwards shear
+        ax.annotate('', xy=(WX / 2 + s * 7.0, yy + s * 1.5),
+                    xytext=(WX / 2 - s * 7.0, yy + s * 1.5),
+                    arrowprops=dict(arrowstyle='-|>', color=INK, lw=1.2))
+    for xx in (-2.2, WX + 2.2):                  # barostat, along the gradient
+        for s in (1, -1):
+            ax.annotate('', xy=(xx, WY / 2 + s * 1.0),
+                        xytext=(xx, WY / 2 + s * 7.5),
+                        arrowprops=dict(arrowstyle='-|>', color='#4a7d52',
+                                        lw=1.2, mutation_scale=8))
+    ax.text(WX / 2, WY + 2.6, r'shear rate $\dot\gamma$', ha='center',
+            va='bottom', color=INK, fontsize=7)
+    ax.text(WX + 4.4, WY / 2, r'pressure $P$', ha='center', va='center',
+            color='#4a7d52', fontsize=7, rotation=270)
+    ax.text(0.0, -2.4, r'random forces from the bath, set by $\Theta$',
+            ha='left', va='top', color=HOT, fontsize=7)
+    ax.set_xlim(-7.0, WX + 7.0)
+    ax.set_ylim(-4.2, WY + 3.6)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    ax.set_title('(a)  one run', loc='left')
 
 
 def cells(d, rx=RXM):
@@ -133,9 +191,11 @@ R2 = {k: v for k, v in R2.items() if v}
 R3 = {k: v for k, v in R3.items() if v}
 
 # ---------------------------------------------------------------- figure 1
-fig, ax = plt.subplots(2, 1, figsize=(W, 4.5))
+fig, ax = plt.subplots(3, 1, figsize=(W, 5.15),
+                       gridspec_kw=dict(height_ratios=[0.62, 1.5, 1.65]))
+panel_setup(ax[0])
 
-a = ax[0]
+a = ax[1]
 SHOW = [0.0, 0.1, 0.3, 1.0]
 shades = plt.cm.viridis(np.linspace(0.08, 0.82, len(SHOW)))
 for col, mg in zip(shades, SHOW):
@@ -158,11 +218,12 @@ plain_ticks(a, 'x', [0.1, 1, 10])
 plain_ticks(a, 'y', [0.8, 0.9, 1.0, 1.1])
 a.set_xlabel(r'$\Theta/\Theta_0$')
 a.set_ylabel(r'$\mu/\mu(\Theta_0)$')
-a.set_title(r'(a)  friction against temperature, $I$ fixed', loc='left')
+a.set_title(r'(b)  friction against temperature, $\In$ fixed'.replace(
+    r'$\In$', '$I$'), loc='left')
 a.legend(frameon=False, ncol=2, handletextpad=0.4, columnspacing=1.0,
          loc='upper right')
 
-b = ax[1]
+b = ax[2]
 for tag, R in (('2D', R2), ('3D', R3)):
     m = np.array(sorted(R))
     b.errorbar(m, [R[x][0] for x in m], yerr=[R[x][1] for x in m],
@@ -189,7 +250,7 @@ b.set_xticklabels(['0', '0.05', '0.1', '0.2', '0.5', '1'])
 b.set_xticks([], minor=True)
 b.set_xlabel(r'grain friction  $\mu_g$')
 b.set_ylabel(r'$n$')
-b.set_title('(b)  the exponent is a property of the grains', loc='left')
+b.set_title('(c)  the exponent is a property of the grains', loc='left')
 b.legend(frameon=False, loc='upper left', handletextpad=0.4)
 fig.tight_layout(pad=0.4); fig.savefig('figL1_frictionlaw.png')
 print('wrote figL1_frictionlaw.png')
