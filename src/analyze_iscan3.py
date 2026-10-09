@@ -356,7 +356,16 @@ def main():
                         u.append(np.log(r['Theta'] / c['T0']))
                         y.append(np.log(r['mu']))
                         L.append(np.log(I / 3.162e-4))
-                        grp.append(f'{tag}{round(r["Tgran"], 12)}')
+                        # One jackknife group per temperature TARGET, shared
+                        # by all three arms.  The arms are run on the same
+                        # packings over the same grid of targets, so a target
+                        # is the correlated unit, and deleting it from one arm
+                        # at a time understates how far the fit leans on it.
+                        # This is the grouping Sec. V's profile was computed
+                        # with (REFEREE_FINDINGS.md, round two, N1); an
+                        # earlier version of this block grouped per arm and
+                        # target, which inflates the errors at warm positions.
+                        grp.append(f'{round(r["Tgran"], 12)}')
         u = np.array(u); y = np.array(y); L = np.array(L); grp = np.array(grp)
         A = np.vstack([np.ones_like(u), L, u, L * u, u ** 2, L * u ** 2]).T
         (beta, be), (gam, ge) = jk(A, y, grp, [3, 5])
@@ -367,16 +376,22 @@ def main():
         # turns that into a coefficient with the same calibrated jackknife,
         # so the coupling can be quoted across the window, not only at
         # Theta_0.  The companion paper's closing relies on these.
-        ends = []
-        for u_star in (float(u.min()), float(u.max())):
+        def at(u_star):
             v = u - u_star
             As = np.vstack([np.ones_like(v), L, v, L * v, v ** 2, L * v ** 2]).T
             (bs, bse), = jk(As, y, grp, [3])
-            ends.append((u_star, -bs, bse))
-        c['profile'] = ends
+            return u_star, -bs, bse
+        ends = [at(float(u.min())), at(float(u.max()))]
+        # the position where dn/dlnI is best determined, searched on a grid;
+        # Sec. V quotes it, named as such, alongside the three stated positions
+        mv = min((at(float(s)) for s in np.linspace(u.min(), u.max(), 221)),
+                 key=lambda r: r[2])
+        c['profile'] = ends + [mv]
         print(f'  {"":>6}   cold end (u = {ends[0][0]:+.2f}): '
               f'{ends[0][1]:+.4f}+/-{ends[0][2]:.4f}    hot end (u = '
               f'{ends[1][0]:+.2f}): {ends[1][1]:+.4f}+/-{ends[1][2]:.4f}')
+        print(f'  {"":>6}   minimum-variance position (u = {mv[0]:+.2f}): '
+              f'{mv[1]:+.4f}+/-{mv[2]:.4f}   ({abs(mv[1])/mv[2]:.1f} sigma)')
     print('  separability requires dn/dlnI = 0 at every friction.')
 
     # ------------------------------------------------------------------ T1
