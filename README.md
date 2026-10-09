@@ -1,5 +1,7 @@
 # Granular temperature and the inertial number in dense granular flow
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alexandermprofumo-rgb/granular-temperature-rheology/blob/main/notebooks/reproduce_figures.ipynb)
+
 Simulation and analysis code for a study of how the effective friction of a
 dense granular flow depends on granular temperature at fixed inertial number,
 in two and three dimensions.
@@ -70,6 +72,10 @@ dumps they fail rather than skipping. Nothing in the paper's figure or
 constraint pipeline depends on them.
 
 ## Reproducing the figures
+
+In a browser: open `notebooks/reproduce_figures.ipynb` in Colab with the badge
+at the top of this page. It downloads the log archive from Zenodo, rebuilds all
+ten figures and checks each one against the manuscript's copy. Locally:
 
 Python 3.11+ with `numpy`, `scipy`, `matplotlib`.
 
