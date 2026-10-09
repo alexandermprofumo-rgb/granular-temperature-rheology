@@ -362,6 +362,21 @@ def main():
         (beta, be), (gam, ge) = jk(A, y, grp, [3, 5])
         print(f'  {c["mg"]:>6} {-beta:>11.4f}+/-{be:.4f} {abs(beta)/be:>7.1f}'
               f' {-2*gam:>11.4f}+/-{2*ge:.4f} {abs(gam)/ge:>7.1f}')
+        # dn/dlnI is a statement at one temperature: within the quadratic it
+        # is -(beta + 2 gamma u).  Refitting about the two ends of the window
+        # turns that into a coefficient with the same calibrated jackknife,
+        # so the coupling can be quoted across the window, not only at
+        # Theta_0.  The companion paper's closing relies on these.
+        ends = []
+        for u_star in (float(u.min()), float(u.max())):
+            v = u - u_star
+            As = np.vstack([np.ones_like(v), L, v, L * v, v ** 2, L * v ** 2]).T
+            (bs, bse), = jk(As, y, grp, [3])
+            ends.append((u_star, -bs, bse))
+        c['profile'] = ends
+        print(f'  {"":>6}   cold end (u = {ends[0][0]:+.2f}): '
+              f'{ends[0][1]:+.4f}+/-{ends[0][2]:.4f}    hot end (u = '
+              f'{ends[1][0]:+.2f}): {ends[1][1]:+.4f}+/-{ends[1][2]:.4f}')
     print('  separability requires dn/dlnI = 0 at every friction.')
 
     # ------------------------------------------------------------------ T1
