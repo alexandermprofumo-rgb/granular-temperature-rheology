@@ -483,6 +483,10 @@ b.set_xscale('log')
 b.set_xlabel(r'stiffness number  $\kappa=E/P$')
 b.set_ylabel(r'$dn/d\ln\dot\gamma$')
 b.set_title('(b)  shear-rate dependence against stiffness', loc='left')
-b.legend(frameon=False, loc='lower left')
+# headroom above the frictionless points, so the key sits top right, clear of
+# the data and next to the series it names first
+lo_, hi_ = b.get_ylim()
+b.set_ylim(lo_, hi_ + 0.30 * (hi_ - lo_))
+b.legend(frameon=False, loc='upper right')
 fig.tight_layout(pad=0.4); fig.savefig('figL3_stiffness.png')
 print('wrote figL3_stiffness.png')
