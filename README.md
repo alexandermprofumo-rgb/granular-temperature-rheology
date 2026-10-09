@@ -77,7 +77,7 @@ In a browser: open `notebooks/reproduce_figures.ipynb` in Colab with the badge
 at the top of this page. It downloads the log archive from Zenodo, rebuilds all
 ten figures and checks each one against the manuscript's copy. Locally:
 
-Python 3.11+ with `numpy`, `scipy`, `matplotlib`.
+Python 3.12+ with `numpy`, `scipy`, `matplotlib` (the pinned numpy needs 3.12).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
