@@ -65,12 +65,13 @@ FAMILIES = (
 )
 
 
-def load(sources):
+def load(sources, mu=None):
+    mu = MU if mu is None else mu
     out = {}
     for d, rx, gfix in sources:
         for p in glob.glob(f'{d}/log.*'):
             m = re.match(rx, os.path.basename(p))
-            if not m or abs(float(m.group('mu')) - MU) > 1e-9:
+            if not m or abs(float(m.group('mu')) - mu) > 1e-9:
                 continue
             q = nfit.parse_log(p)
             if not q:
@@ -112,6 +113,51 @@ def wline(x, y, e):
     c = cov @ A.T @ np.diag(w) @ y
     r = y - A @ c
     return c, np.sqrt(np.diag(cov)), float((r ** 2 * w).sum())
+
+
+def arm_slopes(mu):
+    """dn/dln(gdot) at each stiffness, for figures.
+
+    The same reading main() prints: every case at the centre of the Theta
+    window the cases share, a straight line through each stiffness's shear
+    rates.  Returns {tag: (kappa, slope, error)}, empty if too few cases.
+    """
+    grid = {}
+    for tag, E, src in FAMILIES:
+        C = load(src, mu)
+        for g in GAMMAS:
+            if g in C:
+                grid[(tag, g)] = C[g]
+    for t, _, _ in FAMILIES:
+        gs = [g for g in GAMMAS if (t, g) in grid]
+        if len(gs) < 3:
+            for g in gs:
+                grid.pop((t, g), None)
+    if len(grid) < 6:
+        return {}
+    keep = {k: gated(v) for k, v in grid.items()}
+    common = sorted(set.intersection(*(set(v) for v in keep.values())))
+    if len(common) < 4:
+        return {}
+    theta0 = overlap_theta0(grid, common)
+    out = {}
+    for tag, E, _ in FAMILIES:
+        pts = []
+        for g in GAMMAS:
+            if (tag, g) not in grid:
+                continue
+            r = nfit.fit_local_sys(grid[(tag, g)], theta0,
+                                   fn=nfit.fit_local_adaptive,
+                                   restrict_to=common, z_min=ZMIN)
+            if r:
+                pts.append((np.log(g), r['n'],
+                            float(np.hypot(r['tot'], r.get('sys_deg', 0.0)))))
+        if len(pts) < 3:
+            continue
+        x, y, e = map(np.array, zip(*pts))
+        c, s, _ = wline(x, y, e)
+        out[tag] = (E / P_CONF, float(c[1]), float(s[1]))
+    return out
 
 
 def main():
