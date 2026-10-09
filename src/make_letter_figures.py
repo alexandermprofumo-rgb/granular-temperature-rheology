@@ -215,7 +215,7 @@ def arm_cells(pattern, rx):
 ARMDATA = {tag: (I, arm_cells(p, rx)) for tag, I, p, rx in ARMS}
 
 
-def panel_arms(a, mg, ttl):
+def panel_arms(a, mg, ttl, leg='lower left'):
     """mu(Theta) for the three shear rates at one friction, over the shared window."""
     pools = [(tag, ARMDATA[tag][0], ARMDATA[tag][1][mg])
              for tag, _, _, _ in ARMS if mg in ARMDATA[tag][1]]
@@ -255,7 +255,7 @@ def panel_arms(a, mg, ttl):
     a.set_xlabel(r'$\Theta/\Theta_0$')
     a.set_ylabel(r'$\mu/\mu(\Theta_0)$')
     a.set_title(ttl, loc='left')
-    a.legend(frameon=False, loc='lower left')
+    a.legend(frameon=False, loc=leg)
 
 
 # panel (a) is drawn at equal aspect, so its allocated height has to be large
@@ -264,7 +264,9 @@ fig, ax = plt.subplots(3, 1, figsize=(W, 5.6),
                        gridspec_kw=dict(height_ratios=[0.78, 1.5, 1.5]))
 panel_setup(ax[0])
 panel_arms(ax[1], 0.3, r'(b)  frictional grains, $\mu_g=0.3$')
-panel_arms(ax[2], 0.0, '(c)  frictionless grains')
+# the frictionless series lie low on the shared scale, so their legend goes
+# in the empty upper right rather than over the points
+panel_arms(ax[2], 0.0, '(c)  frictionless grains', leg='upper right')
 # one vertical scale for both, so the fan in (b) and its absence in (c) are
 # compared by eye rather than through two different axes
 lo_ = min(ax[1].get_ylim()[0], ax[2].get_ylim()[0])
