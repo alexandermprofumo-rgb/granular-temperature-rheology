@@ -57,23 +57,30 @@ OUT = {}
 # Panel 1(a) draws a real packing rather than a cartoon, because the point of
 # it is that a reader can see what one run is.  Both comparison Letters open
 # with a picture of the system and this one did not.
-PACKING = 'sweep_matched2d/data.m2d_seed1'
+# the last frame of a steady sheared run, 2D, mu_g = 0.3, default stiffness
+PACKING = 'sweep_tracking_matched2d/dump.atoms.mu0.3_T0.001_s1'
 WX, WY = 62.0, 11.0             # the window drawn, in grain diameters
 INK, GRAIN, EDGE, HOT = '#2b2b2b', '#c9d6e4', '#5b7fa6', '#c0504d'
 
 
-def read_packing(path):
-    xs, ys, rs = [], [], []
+def read_packing(path, x0=2.0, y0=25.0):
+    """Grain positions and radii from the last frame of a LAMMPS atom dump,
+    wrapped into the sheared periodic cell and shifted so the drawn window
+    starts at (x0, y0)."""
     with open(path) as f:
-        rows = f.read().split('Atoms # sphere')[1].strip().split('\n')
-    for r in rows:
-        t = r.split()
-        if len(t) < 7:
-            continue
-        rs.append(float(t[2]) / 2.0)
-        xs.append(float(t[4]))
-        ys.append(float(t[5]))
-    return np.array(xs), np.array(ys), np.array(rs)
+        frame = f.read().split('ITEM: TIMESTEP')[-1].split('\n')
+    (xlo, xhi, xy), (ylo, yhi, _) = [tuple(map(float, frame[i].split()))
+                                     for i in (5, 6)]
+    rows = np.array([list(map(float, r.split())) for r in frame[9:] if r.strip()])
+    x, y, rad = rows[:, 1], rows[:, 2], rows[:, 6]
+    # the box is a tilted (Lees-Edwards) cell, so the periodic image in x is
+    # offset by the tilt at the grain's height
+    # dump bounds enclose the tilted cell, so its own length is shorter by xy
+    lx, ly = xhi - xlo - abs(xy), yhi - ylo
+    y = ylo + np.mod(y - ylo, ly)
+    shift = xy * (y - ylo) / ly
+    x = xlo + shift + np.mod(x - xlo - shift, lx)
+    return x - x0, y - y0, rad
 
 
 def panel_setup(ax):
@@ -109,7 +116,7 @@ def panel_setup(ax):
     ax.set_ylim(-4.0, WY + 3.4)
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title('(a)  one run', loc='left')
+    ax.set_title('(a)  part of a sheared packing', loc='left')
 
 
 def cells(d, rx=RXM):
