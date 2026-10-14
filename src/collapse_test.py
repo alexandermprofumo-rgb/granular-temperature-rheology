@@ -29,6 +29,7 @@ import nfit
 ZMIN = 3.0
 CANON = 8.4664e-04
 P_KK = 1 / 6
+P_KK2D = 1 / 8     # Kim and Kamrin's exponent for disks; these series are 2D
 RXG = (r'log\.g(?P<g>[0-9.eE+-]+)_mu(?P<mu>[0-9.]+)'
        r'_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$')
 RXM = r'log\.mu(?P<mu>[0-9.]+)_T(?P<T>[0-9.eE+-]+)_s(?P<s>\d+)$'
@@ -130,6 +131,9 @@ for mg in (0.0, 0.15, 0.3):
     print(f'  ratio best-p scatter / own-fit scatter = {r_star / r_floor:.2f}')
     for tag, (rel, x) in kk_error(arms, CANON).items():
         print(f'  p = 1/6 calibrated at Theta_0, {tag}: worst {100 * rel:+.1f}%'
+              f' at Theta/Theta_0 = {x:.2f}')
+    for tag, (rel, x) in kk_error(arms, CANON, P_KK2D).items():
+        print(f'  p = 1/8 calibrated at Theta_0, {tag}: worst {100 * rel:+.1f}%'
               f' at Theta/Theta_0 = {x:.2f}')
     # the cost of the form itself: even the best single exponent misses
     for tag, (rel, x) in kk_error(arms, CANON, p_star).items():
