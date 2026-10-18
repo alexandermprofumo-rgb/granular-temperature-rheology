@@ -56,6 +56,10 @@ def series(mg):
     """Per arm: arrays of Theta, mu, I, one point per setpoint in the window."""
     pools = [(tag, DATA[tag][mg]) for tag, _, _, _ in ARMS if mg in DATA[tag]]
     T0, (lo, hi) = nfit.common_theta0([p[1] for p in pools])
+    # the reference temperature Fig. 1 uses: the canonical one where it lies
+    # well inside the shared window, the window's own centre otherwise
+    global TUSE
+    TUSE = CANON if lo * 1.3 <= CANON <= hi / 1.3 else T0
     out = {}
     for tag, runs in pools:
         keep = [t for t in jammed(runs, ZMIN)
@@ -123,20 +127,21 @@ for mg in (0.0, 0.15, 0.3):
     p_star = best_p(arms)
     r_star, r_kk, r_floor = (collapse_rms(arms, p_star), collapse_rms(arms, P_KK),
                              floor_rms(arms))
-    print(f'mu_g = {mg}:  window {lo:.3g} to {hi:.3g} ({hi / lo:.1f}x)')
+    print(f'mu_g = {mg}:  window {lo:.3g} to {hi:.3g} ({hi / lo:.1f}x),'
+          f' calibrated at {TUSE:.3g}')
     print(f'  best common p = {p_star:.3f}')
     print(f'  scatter of ln(mu Theta^p) about each series:'
           f'  {100 * r_star:.2f}% at best p,  {100 * r_kk:.2f}% at p = 1/6,'
           f'  {100 * r_floor:.2f}% with each series fitted alone')
     print(f'  ratio best-p scatter / own-fit scatter = {r_star / r_floor:.2f}')
-    for tag, (rel, x) in kk_error(arms, CANON).items():
+    for tag, (rel, x) in kk_error(arms, TUSE).items():
         print(f'  p = 1/6 calibrated at Theta_0, {tag}: worst {100 * rel:+.1f}%'
               f' at Theta/Theta_0 = {x:.2f}')
-    for tag, (rel, x) in kk_error(arms, CANON, P_KK2D).items():
+    for tag, (rel, x) in kk_error(arms, TUSE, P_KK2D).items():
         print(f'  p = 1/8 calibrated at Theta_0, {tag}: worst {100 * rel:+.1f}%'
               f' at Theta/Theta_0 = {x:.2f}')
     # the cost of the form itself: even the best single exponent misses
-    for tag, (rel, x) in kk_error(arms, CANON, p_star).items():
+    for tag, (rel, x) in kk_error(arms, TUSE, p_star).items():
         print(f'  best p calibrated at Theta_0, {tag}: worst {100 * rel:+.1f}%'
               f' at Theta/Theta_0 = {x:.2f}')
     for tag, (th, mu, I) in arms.items():
