@@ -142,7 +142,6 @@ acknowledgments. That statement covers the text; this one covers the code.
 | File | Scope |
 |---|---|
 | `src/nfit.py` | setpoint gating, adaptive-degree fitting, the frozen-degree jackknife and its analytic null, the degree systematic |
-| `src/analyze_iscan3.py` | the three-arm separability test, the window-matching gate, the model-free sub-window slopes |
 | `src/analyze_iscan3d.py` | the three-dimensional separability test and its per-arm constancy test |
 | `src/make_paper_figures.py` | all six paper figures |
 | `src/constraints_final.py` | the constraint table, adaptive and quadratic cross-check, split error reporting, the peak selection-bias calculation |
@@ -159,6 +158,8 @@ acknowledgments. That statement covers the text; this one covers the code.
 | `src/make_fig_schematic.py` | the whole file |
 | `src/make_letter_figures.py` | the whole file |
 | `src/athermal_table.py` | the whole file |
+| `src/collapse_test.py` | the whole file |
+| `src/make_collapse_panel.py` | the whole file |
 | `src/analyze_iscan3.py` | the three-arm separability test, the window-matching gate, the model-free sub-window slopes, the joint test under intersected windows and a cubic |
 | `src/audit_trail.py` | the whole file |
 | `src/stiffness_matched.py`, `src/damping_matched.py`, `src/levers_matched.py`, `src/frictionlaw_matched.py`, `src/kk_master.py` | the whole file, each |
