@@ -252,8 +252,13 @@ def panel_arms(a, mg, ttl, leg='lower left'):
             else f'{e10:.1f}'
         a.plot(th / Tuse, mu / at_theta0(th, mu, Tuse), 'o', ms=3.2, color=col,
                label=rf'$I=10^{{{ex}}}$,  $n={got_n[0]:.3f}$')
-        xs = np.array([th.min(), th.max()]) / Tuse
-        a.plot(xs, xs ** (-got_n[0]), '-', color=col, lw=1.0)
+        # a smooth local quadratic through the series, not the tangent at
+        # Theta_0, which overshoots the points wherever mu(Theta) curves
+        u = np.log(th / Tuse)
+        c = np.polyfit(u, np.log(mu), min(2, len(u) - 1))
+        m0 = np.exp(np.polyval(c, 0.0))
+        uu = np.linspace(u.min(), u.max(), 60)
+        a.plot(np.exp(uu), np.exp(np.polyval(c, uu)) / m0, '-', color=col, lw=1.0)
         print(f'  mu_g = {mg}, {tag}: n = {got_n[0]:.4f} +/- {got_n[1]:.4f}'
               f'  over {len(keep)} setpoints')
     a.set_xscale('log'); a.set_yscale('log')
