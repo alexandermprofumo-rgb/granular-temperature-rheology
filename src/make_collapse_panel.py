@@ -57,3 +57,39 @@ ax[0].legend(frameon=False, loc='upper right', handletextpad=0.2)
 fig.tight_layout(pad=0.4)
 fig.savefig('figL1_collapse_candidate.png')
 print('wrote figL1_collapse_candidate.png')
+
+
+# A second candidate: the plain test.  Eq. (1) says heating by a given factor
+# lowers mu by the same fraction at every shear rate, so mu scaled to 1 at
+# Theta_0 should fall on one curve.  Smooth fits replace the tangents of the
+# current Fig. 1, which overshoot the points wherever mu(Theta) curves.
+fig, ax = plt.subplots(2, 1, figsize=(W, 3.6))
+for a, mg, ttl in ((ax[0], '0.3', r'(b)  frictional grains, $\mu_g=0.3$'),
+                   (ax[1], '0.0', r'(c)  frictionless grains')):
+    sel = [r for r in rows if r['mu_g'] == mg]
+    for arm in ('slow', 'mid', 'fast'):
+        s_ = [r for r in sel if r['arm'] == arm]
+        th = np.array([float(r['Theta']) for r in s_]) / CANON
+        mu = np.array([float(r['mu']) for r in s_])
+        u = np.log(th)
+        c = np.polyfit(u, np.log(mu), 2)
+        m0 = np.exp(np.polyval(c, 0.0))
+        a.plot(th, mu / m0, 'o', ms=3.2, color=COL[arm], label=LAB[arm], zorder=3)
+        uu = np.linspace(u.min(), u.max(), 50)
+        a.plot(np.exp(uu), np.exp(np.polyval(c, uu)) / m0, '-', color=COL[arm],
+               lw=1.0, zorder=2)
+    a.set_xscale('log'); a.set_yscale('log')
+    a.set_ylim(0.78, 1.42)
+    a.set_yticks([0.8, 0.9, 1.0, 1.2, 1.4])
+    a.set_yticklabels(['0.8', '0.9', '1', '1.2', '1.4'])
+    a.set_yticks([], minor=True)
+    a.set_xticks([0.3, 1, 3, 10]); a.set_xticklabels(['0.3', '1', '3', '10'])
+    a.set_xticks([], minor=True)
+    a.set_xlim(0.2, 15)
+    a.set_xlabel(r'$\Theta/\Theta_0$')
+    a.set_ylabel(r'$\mu/\mu(\Theta_0)$')
+    a.set_title(ttl, loc='left')
+ax[0].legend(frameon=False, loc='upper right', handletextpad=0.2)
+fig.tight_layout(pad=0.4)
+fig.savefig('figL1_plain_candidate.png')
+print('wrote figL1_plain_candidate.png')
