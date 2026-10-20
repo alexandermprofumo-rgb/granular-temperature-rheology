@@ -406,6 +406,13 @@ lo_, hi_ = a.get_ylim()
 a.set_ylim(lo_, hi_ + 0.30 * (hi_ - lo_))
 a.legend(frameon=False, loc='upper center', ncol=1, handletextpad=0.4)
 fig.tight_layout(pad=0.4); fig.savefig('figL2_frictionlaw.png')
+# the points behind panel (a), so its axis can be redrawn without rerunning
+# the fits (make_fig2_axis_variants.py)
+import json
+json.dump({'R2': {str(k): v for k, v in R2.items()},
+           'R3': {str(k): v for k, v in R3.items()},
+           'branch': BRANCH, 'published': PUBLISHED},
+          open('friction_law_points.json', 'w'), indent=1)
 print('wrote figL2_frictionlaw.png')
 
 
