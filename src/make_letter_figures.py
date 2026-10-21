@@ -509,3 +509,93 @@ b.set_ylim(lo_, hi_ + 0.30 * (hi_ - lo_))
 b.legend(frameon=False, loc='upper right')
 fig.tight_layout(pad=0.4); fig.savefig('figL3_stiffness.png')
 print('wrote figL3_stiffness.png')
+
+
+# =================================================== restructured figure set
+# The restructured Letter tells the shear-rate result in one place and the
+# size of the exponent in another, so its figures follow that grouping.
+#   figL2_grid        the shear-rate dependence of n against stiffness
+#   figL3_grainprops  (a) n against grain friction, (b) its change with
+#                     stiffness, (c) the share of n carried by each term
+# All three panels of figL3 share one linear axis in grain friction, so the
+# friction law is drawn straight, as the text describes it.
+
+fig, b = plt.subplots(figsize=(W, 2.35))
+b.axhline(0, color='k', lw=0.8)
+for mg, key, mk, lab in ((0.3, 'tan', 'o', r'$\mu_g=0.3$'),
+                         (0.0, 'fl', 's', 'frictionless')):
+    sl = cg.arm_slopes(mg)
+    k = np.array([v[0] for v in sl.values()])
+    s = np.array([v[1] for v in sl.values()])
+    e = np.array([v[2] for v in sl.values()])
+    o = np.argsort(k)
+    b.errorbar(k[o], s[o], yerr=e[o], marker=mk, ms=3.8, lw=1.0,
+               elinewidth=1.0, capsize=2, color=C[key], label=lab)
+b.set_xscale('log')
+b.set_xlabel(r'stiffness number  $\kappa=E/P$')
+b.set_ylabel(r'$dn/d\ln\dot\gamma$')
+lo_, hi_ = b.get_ylim()
+b.set_ylim(lo_, hi_ + 0.30 * (hi_ - lo_))
+b.legend(frameon=False, loc='upper right')
+fig.tight_layout(pad=0.4); fig.savefig('figL2_grid.png')
+print('wrote figL2_grid.png')
+
+fig, ax = plt.subplots(3, 1, figsize=(W, 6.4), sharex=True)
+a = ax[0]
+for tag, R in (('2D', R2), ('3D', R3)):
+    m = np.array(sorted(R))
+    a.errorbar(m, [R[x][0] for x in m], yerr=[R[x][1] for x in m],
+               marker='o', ms=3.6, lw=0, elinewidth=1.0, capsize=2,
+               color=C[tag], label=tag)
+    sel = [x for x in m if x <= BRANCH[tag]]
+    c_, _ = wline(np.array(sel), np.array([R[x][0] for x in sel]),
+                  np.array([R[x][1] for x in sel]))
+    xs = np.linspace(0, BRANCH[tag], 20)
+    a.plot(xs, c_[0] + c_[1] * xs, '-', color=C[tag], lw=1.1)
+    a.axhline(PUBLISHED[tag], ls=':', lw=1.0, color=C[tag])
+# the labels sit at the right, above the high-friction points and clear of
+# the peak
+a.text(1.03, PUBLISHED['3D'] + 0.006, r'spheres, $p=1/6$',
+       fontsize=6.5, color=C['3D'], ha='right')
+a.text(1.03, PUBLISHED['2D'] + 0.006, r'disks, $p=1/8$',
+       fontsize=6.5, color=C['2D'], ha='right')
+a.set_ylim(0, 0.34); a.set_ylabel(r'$n$')
+a.set_title('(a)  the exponent', loc='left')
+a.legend(frameon=False, loc='upper right', handletextpad=0.4)
+
+a = ax[1]
+a.axhline(0, color='k', lw=0.8)
+for key, mk in (('mod', 'o'), ('prs', 's')):
+    C_, *_ = lever_cells(key)
+    xs, ys, es = [], [], []
+    for mg in sorted({m for (m, _) in C_}):
+        got = lever_slope(key, mg)
+        if got:
+            xs.append(mg); ys.append(got[0]); es.append(got[1])
+    dodge = 0.008 if key == 'mod' else -0.008
+    a.errorbar(np.array(xs) + dodge, ys, yerr=es, marker=mk, ms=3.6, lw=0,
+               elinewidth=1.0, capsize=2, color=C[key], label=LEVERS[key][6])
+peak = max(R2, key=lambda m: R2[m][0])
+a.axvline(peak, ls='--', lw=0.9, color='0.45')
+a.text(peak + 0.02, -0.031, 'peak of $n$\nin (a)', fontsize=6.5, color='0.35',
+       va='bottom')
+a.set_ylabel(r'$dn/d\ln\kappa$')
+a.set_title('(b)  its change with stiffness', loc='left')
+a.legend(frameon=False, loc='upper right')
+
+a = ax[2]
+sh = channel_shares()
+for col, key, lab in ((1, 'geo', 'arrangement of contacts'),
+                      (2, 'nrm', 'unequal normal forces'),
+                      (3, 'tan', 'tangential grip')):
+    a.plot(sh[:, 0], sh[:, col], 'o-', ms=3.4, lw=1.1, color=C[key], label=lab)
+a.axhline(0, color='k', lw=0.7)
+a.set_ylabel(r'share of $n$')
+a.set_title('(c)  the share of $n$ carried by each term', loc='left')
+lo_, hi_ = a.get_ylim()
+a.set_ylim(lo_, hi_ + 0.30 * (hi_ - lo_))
+a.legend(frameon=False, loc='upper center', handletextpad=0.4)
+a.set_xlim(-0.03, 1.05)
+a.set_xlabel(r'grain friction  $\mu_g$')
+fig.tight_layout(pad=0.4); fig.savefig('figL3_grainprops.png')
+print('wrote figL3_grainprops.png')
