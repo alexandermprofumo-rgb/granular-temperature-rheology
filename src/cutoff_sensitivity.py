@@ -7,10 +7,9 @@ three-dimensional grain-friction scans with each threshold moved, and reports
 the largest shift in units of the quoted error. Run from RESEARCH_LAMMPS/.
 
 Result (2026-11-02): pressure limit 0.10 to 0.30 and inertial-number limit
-0.02 to 0.06 change no value of n in either scan. The setpoints the fixed-I
-cutoff removes sit 6% to 50% off the median, at the coldest target, and the
-runs that would fail the barostat cutoff are already removed by the jamming
-cutoff.
+0.02 to 0.06 change no value of n in either scan. Every setpoint the fixed-I
+cutoff removes is the coldest of its case, 3% to 50% off the median, and the
+setpoints near either threshold are also removed by the other cutoffs.
 """
 import glob
 import os
