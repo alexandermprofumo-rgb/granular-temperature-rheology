@@ -11,6 +11,10 @@ log.lammps*
 *.restart
 data.granular*
 prof.*
+# The velocity profiles for Fig. 3 are small and ship with the code.
+!src/velprof/prof.*
+# Zenodo log archive, downloaded by the notebook.
+lammps-logs-*.tar.xz
 
 # Regenerated analysis tables.  analyze_ktgrid.py and build_master_table.py
 # write here by default so a rerun does not overwrite the tracked tables.
