@@ -540,7 +540,12 @@ b.legend(frameon=False, loc='upper right')
 fig.tight_layout(pad=0.4); fig.savefig('figL2_grid.png')
 print('wrote figL2_grid.png')
 
-fig, ax = plt.subplots(3, 1, figsize=(W, 6.4), sharex=True)
+fig, ax = plt.subplots(3, 1, figsize=(W, 6.9), sharex=True)
+# every panel carries its own grain-friction axis, labelled and numbered, so
+# each can be read on its own (the professor's comment, 2026-11-04)
+for a in ax:
+    a.tick_params(labelbottom=True)
+    a.set_xlabel(r'grain friction  $\mu_g$')
 a = ax[0]
 for tag, R in (('2D', R2), ('3D', R3)):
     m = np.array(sorted(R))
