@@ -160,6 +160,7 @@ acknowledgments. That statement covers the text; this one covers the code.
 | `src/athermal_table.py` | the whole file |
 | `src/collapse_test.py` | the whole file |
 | `src/make_collapse_panel.py` | the whole file |
+| `src/cutoff_sensitivity.py` | the whole file |
 | `src/analyze_iscan3.py` | the three-arm separability test, the window-matching gate, the model-free sub-window slopes, the joint test under intersected windows and a cubic |
 | `src/audit_trail.py` | the whole file |
 | `src/stiffness_matched.py`, `src/damping_matched.py`, `src/levers_matched.py`, `src/frictionlaw_matched.py`, `src/kk_master.py` | the whole file, each |
