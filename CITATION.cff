@@ -8,6 +8,7 @@ abstract: >-
 authors:
   - family-names: Profumo
     given-names: Alexander
+    orcid: "https://orcid.org/0009-0004-4106-0453"
     email: 28profumoa@pcscharter.org
     city: Santa Cruz
     region: California
@@ -29,16 +30,17 @@ references:
     authors:
       - family-names: Profumo
         given-names: Alexander
+        orcid: "https://orcid.org/0009-0004-4106-0453"
     doi: "10.5281/zenodo.22879491"
     version: "1.1.0"
     year: 2026
 preferred-citation:
   type: article
   title: >-
-    Grain properties set the granular-temperature response of dense granular
-    flow
+    Grain Friction Breaks Temperature Scaling in Dense Granular Flow
   authors:
     - family-names: Profumo
       given-names: Alexander
+      orcid: "https://orcid.org/0009-0004-4106-0453"
   year: 2026
   # journal, volume, pages and doi: fill in on acceptance
