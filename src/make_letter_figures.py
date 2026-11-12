@@ -565,7 +565,7 @@ a.text(1.03, PUBLISHED['3D'] + 0.006, r'spheres, $p=1/6$',
 a.text(1.03, PUBLISHED['2D'] + 0.006, r'disks, $p=1/8$',
        fontsize=6.5, color=C['2D'], ha='right')
 a.set_ylim(0, 0.34); a.set_ylabel(r'$n$')
-a.set_title('(a)  the exponent', loc='left')
+a.set_title('(a)', loc='left')
 a.legend(frameon=False, loc='upper right', handletextpad=0.4)
 
 a = ax[1]
@@ -585,7 +585,7 @@ a.axvline(peak, ls='--', lw=0.9, color='0.45')
 a.text(peak + 0.02, -0.031, 'peak of $n$\nin (a)', fontsize=6.5, color='0.35',
        va='bottom')
 a.set_ylabel(r'$dn/d\ln\kappa$')
-a.set_title('(b)  its change with stiffness', loc='left')
+a.set_title('(b)', loc='left')
 a.legend(frameon=False, loc='upper right')
 
 a = ax[2]
@@ -596,7 +596,7 @@ for col, key, lab in ((1, 'geo', 'arrangement of contacts'),
     a.plot(sh[:, 0], sh[:, col], 'o-', ms=3.4, lw=1.1, color=C[key], label=lab)
 a.axhline(0, color='k', lw=0.7)
 a.set_ylabel(r'share of $n$')
-a.set_title('(c)  the share of $n$ carried by each term', loc='left')
+a.set_title('(c)', loc='left')
 lo_, hi_ = a.get_ylim()
 a.set_ylim(lo_, hi_ + 0.30 * (hi_ - lo_))
 a.legend(frameon=False, loc='upper center', handletextpad=0.4)
